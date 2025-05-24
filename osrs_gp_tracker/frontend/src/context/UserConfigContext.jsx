@@ -19,31 +19,44 @@ export const UserConfigProvider = ({ children, userId }) => {
   // Load user configuration on mount or when userId changes
   useEffect(() => {
     const loadUserConfig = async () => {
-      if (!userId) {
-        setLoading(false);
-        return;
-      }
-
       try {
         setLoading(true);
         setError(null);
 
-        // Try to get user config first
         let config = null;
-        try {
-          const response = await getUserConfig(userId);
-          config = response.config;
-        } catch (err) {
-          console.log('No existing user config found, using defaults');
+
+        // If we have a userId, try to get user config first
+        if (userId) {
+          try {
+            console.log('Loading user config for userId:', userId);
+            const response = await getUserConfig(userId);
+            config = response.config;
+            console.log('User config loaded:', config);
+          } catch (err) {
+            console.log('No existing user config found, will use defaults:', err.message);
+          }
         }
 
-        // If no user config exists, get default config
+        // If no user config exists or is empty, get default config
         if (!config || Object.keys(config).length === 0) {
-          const defaultResponse = await getDefaultConfig();
-          config = defaultResponse.config;
+          console.log('Loading default configuration...');
+          try {
+            const defaultResponse = await getDefaultConfig();
+            config = defaultResponse.config;
+            console.log('Default config loaded:', config);
+          } catch (err) {
+            console.error('Failed to load default config:', err);
+            throw err;
+          }
         }
 
-        setUserConfig(config || {});
+        // Ensure we have a valid config
+        if (config && Object.keys(config).length > 0) {
+          setUserConfig(config);
+          console.log('Final config set:', config);
+        } else {
+          throw new Error('No configuration data available');
+        }
       } catch (err) {
         console.error('Error loading user config:', err);
         setError(err.message);
@@ -73,6 +86,7 @@ export const UserConfigProvider = ({ children, userId }) => {
       // Save to backend if userId is available
       if (userId) {
         await saveUserConfig(userId, updatedConfig);
+        console.log('User config saved:', updatedConfig);
       }
     } catch (err) {
       console.error('Error updating user config:', err);
@@ -88,6 +102,7 @@ export const UserConfigProvider = ({ children, userId }) => {
       // Save to backend if userId is available
       if (userId) {
         await saveUserConfig(userId, newConfig);
+        console.log('Full user config saved:', newConfig);
       }
     } catch (err) {
       console.error('Error setting full user config:', err);

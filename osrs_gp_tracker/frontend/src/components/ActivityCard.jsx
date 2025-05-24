@@ -9,6 +9,7 @@ const ActivityCard = ({ title, activityType, userId }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [localParams, setLocalParams] = useState({});
+  const [hasChanges, setHasChanges] = useState(false);
 
   // Get current activity config
   const activityConfig = userConfig[activityType] || {};
@@ -16,11 +17,12 @@ const ActivityCard = ({ title, activityType, userId }) => {
   // Update local params when user config changes
   useEffect(() => {
     setLocalParams(activityConfig);
+    setHasChanges(false);
   }, [activityConfig]);
 
-  // Calculate GP/hour when config changes
+  // Auto-calculate GP/hour when component loads (but not on every change)
   useEffect(() => {
-    if (Object.keys(localParams).length > 0) {
+    if (Object.keys(localParams).length > 0 && !hasChanges) {
       calculateGpHour();
     }
   }, [localParams, userId]);
@@ -34,6 +36,7 @@ const ActivityCard = ({ title, activityType, userId }) => {
       
       if (response.success) {
         setResult(response.result);
+        setHasChanges(false);
       } else {
         setError(response.error || 'Calculation failed');
       }
@@ -45,11 +48,16 @@ const ActivityCard = ({ title, activityType, userId }) => {
   };
 
   const handleParamChange = async (paramName, value) => {
-    const numValue = parseFloat(value) || 0;
+    const numValue = paramName === 'monster_name' ? value : (parseFloat(value) || 0);
     const updatedParams = { ...localParams, [paramName]: numValue };
     
     setLocalParams(updatedParams);
+    setHasChanges(true);
     await updateUserConfig(activityType, { [paramName]: numValue });
+  };
+
+  const handleManualCalculate = () => {
+    calculateGpHour();
   };
 
   const formatNumber = (num) => {
@@ -316,14 +324,19 @@ const ActivityCard = ({ title, activityType, userId }) => {
             )}
           </div>
         ) : (
-          <div className="text-lg text-amber-700">No data available</div>
+          <div className="text-lg text-amber-700">Click "Calculate GP/Hour" to get results</div>
         )}
       </div>
 
       {/* Chart */}
       {result && !result.error && (
         <div className="mb-6">
-          <GPChart data={getChartData()} title={`${title} GP/Hour`} />
+          <div className="mb-2 text-sm text-gray-600">
+            Chart Debug: GP/HR = {result.gp_hr}, Chart Data = {JSON.stringify(getChartData())}
+          </div>
+          <div className="bg-white p-4 rounded-lg border">
+            <GPChart data={getChartData()} title={`${title} GP/Hour`} />
+          </div>
         </div>
       )}
 
@@ -333,45 +346,110 @@ const ActivityCard = ({ title, activityType, userId }) => {
         {renderActivitySpecificInputs()}
       </div>
 
+      {/* Calculate Button */}
+      <div className="text-center mb-6">
+        <button
+          onClick={handleManualCalculate}
+          disabled={loading}
+          className={`osrs-button px-8 py-3 text-lg font-bold disabled:opacity-50 ${
+            hasChanges ? 'bg-orange-600 hover:bg-orange-700 animate-pulse' : ''
+          }`}
+        >
+          {loading ? 'Calculating...' : hasChanges ? 'Recalculate GP/Hour' : 'Calculate GP/Hour'}
+        </button>
+        {hasChanges && (
+          <div className="text-sm text-amber-600 mt-2">
+            Parameters changed - click to recalculate
+          </div>
+        )}
+      </div>
+
       {/* Detailed breakdown */}
       {result && !result.error && (
         <div className="bg-amber-50 p-4 rounded-lg">
           <h3 className="text-lg font-semibold text-amber-800 mb-3">Breakdown</h3>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            {result.costs && (
-              <div>
-                <h4 className="font-medium text-amber-700 mb-1">Costs</h4>
+          
+          {/* Debug info */}
+          <div className="mb-4 p-2 bg-blue-50 rounded text-xs text-blue-700">
+            <strong>Debug:</strong> result keys: {Object.keys(result).join(', ')} | 
+            costs: {result.costs ? 'Yes' : 'No'} | 
+            revenue: {result.revenue ? 'Yes' : 'No'} | 
+            prices_used: {result.prices_used ? 'Yes' : 'No'}
+            <br/>
+            <strong>Full result:</strong> {JSON.stringify(result, null, 2)}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            {/* Costs Section - Fixed text colors */}
+            {result.costs && typeof result.costs === 'object' && Object.keys(result.costs).length > 0 && (
+              <div className="bg-white p-3 rounded border">
+                <h4 className="font-medium text-amber-700 mb-2">💰 Costs</h4>
                 {Object.entries(result.costs).map(([key, value]) => (
-                  <div key={key} className="flex justify-between">
-                    <span className="capitalize">{key.replace('_', ' ')}:</span>
-                    <span>{formatNumber(value)} GP</span>
+                  <div key={key} className="flex justify-between py-1">
+                    <span className="capitalize text-gray-700 font-medium">{key.replace(/_/g, ' ')}:</span>
+                    <span className="font-medium text-gray-900">{formatNumber(value)} GP</span>
                   </div>
                 ))}
               </div>
             )}
-            {result.revenue && (
-              <div>
-                <h4 className="font-medium text-amber-700 mb-1">Revenue</h4>
-                <div className="flex justify-between">
-                  <span>Total:</span>
-                  <span>{formatNumber(result.revenue)} GP</span>
+            
+            <div className="bg-white p-3 rounded border">
+              <h4 className="font-medium text-amber-700 mb-2">📈 Revenue & Profit</h4>
+              {result.revenue && (
+                <div className="flex justify-between py-1">
+                  <span className="text-gray-700">Total Revenue:</span>
+                  <span className="font-medium text-green-700">{formatNumber(result.revenue)} GP</span>
                 </div>
-              </div>
-            )}
-            {result.prices_used && (
-              <div className="col-span-2">
-                <h4 className="font-medium text-amber-700 mb-1">Current Prices</h4>
-                <div className="grid grid-cols-3 gap-2">
-                  {Object.entries(result.prices_used).map(([key, value]) => (
-                    <div key={key} className="flex justify-between text-xs">
-                      <span className="capitalize">{key}:</span>
-                      <span>{formatNumber(value)} GP</span>
-                    </div>
-                  ))}
+              )}
+              {result.profit_per_cycle && (
+                <div className="flex justify-between py-1">
+                  <span className="text-gray-700">Profit per Cycle:</span>
+                  <span className="font-medium text-green-700">{formatNumber(result.profit_per_cycle)} GP</span>
                 </div>
-              </div>
-            )}
+              )}
+              {result.profit_per_run && (
+                <div className="flex justify-between py-1">
+                  <span className="text-gray-700">Profit per Run:</span>
+                  <span className="font-medium text-green-700">{formatNumber(result.profit_per_run)} GP</span>
+                </div>
+              )}
+              {result.cycle_time_hours && (
+                <div className="flex justify-between py-1">
+                  <span className="text-gray-700">Cycle Time:</span>
+                  <span className="font-medium text-gray-900">{(result.cycle_time_hours * 60).toFixed(1)} min</span>
+                </div>
+              )}
+              {result.gp_hr && (
+                <div className="flex justify-between py-1 border-t pt-1">
+                  <span className="font-semibold text-gray-800">GP per Hour:</span>
+                  <span className="font-bold text-amber-600">{formatNumber(result.gp_hr)} GP</span>
+                </div>
+              )}
+            </div>
           </div>
+
+          {result.prices_used && typeof result.prices_used === 'object' && Object.keys(result.prices_used).length > 0 && (
+            <div className="mt-4 bg-white p-3 rounded border">
+              <h4 className="font-medium text-amber-700 mb-2">🏪 Current Market Prices</h4>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                {Object.entries(result.prices_used).map(([key, value]) => (
+                  <div key={key} className="flex justify-between text-xs p-2 bg-gray-50 rounded">
+                    <span className="capitalize font-medium text-gray-700">{key.replace(/_/g, ' ')}:</span>
+                    <span className="text-amber-600 font-medium">{formatNumber(value)} GP</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Show message if no breakdown data */}
+          {(!result.costs || Object.keys(result.costs || {}).length === 0) && 
+           !result.revenue && 
+           (!result.prices_used || Object.keys(result.prices_used || {}).length === 0) && (
+            <div className="text-center text-amber-600 py-4">
+              No detailed breakdown available for this calculation.
+            </div>
+          )}
         </div>
       )}
     </div>
