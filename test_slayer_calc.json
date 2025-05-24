@@ -1,0 +1,13 @@
+{
+  "activity_type": "slayer",
+  "params": {
+    "slayer_master_id": "nieve",
+    "user_slayer_level": 85,
+    "user_combat_level": 100,
+    "user_attack_level": 80,
+    "user_strength_level": 80,
+    "user_defence_level": 75,
+    "user_ranged_level": 85,
+    "user_magic_level": 80
+  }
+} 

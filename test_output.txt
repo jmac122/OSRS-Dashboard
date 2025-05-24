@@ -1,0 +1,102 @@
+INFO:utils.osrs_wiki_sync_service:\u2705 Successfully fetched: https://oldschool.runescape.wiki/w/Gargoyle
+INFO:utils.osrs_wiki_sync_service:Found potential drop table with headers: ['', 'item', 'quantity', 'rarity', 'price', 'high alch']
+INFO:utils.osrs_wiki_sync_service:Found potential drop table with headers: ['', 'item', 'quantity', 'rarity', 'price', 'high alch']
+INFO:utils.osrs_wiki_sync_service:Found potential drop table with headers: ['', 'item', 'quantity', 'rarity', 'price', 'high alch']
+INFO:utils.osrs_wiki_sync_service:Found potential drop table with headers: ['', 'item', 'quantity', 'rarity', 'price', 'high alch']
+WARNING:utils.osrs_wiki_sync_service:Could not parse quantity: 10û20á(noted)
+WARNING:utils.osrs_wiki_sync_service:Could not parse quantity: 150á(noted)
+WARNING:utils.osrs_wiki_sync_service:Could not parse quantity: 15á(noted)
+WARNING:utils.osrs_wiki_sync_service:Could not parse quantity: 10û15á(noted)
+WARNING:utils.osrs_wiki_sync_service:Could not parse quantity: 15á(noted)
+INFO:utils.osrs_wiki_sync_service:Found potential drop table with headers: ['', 'item', 'quantity', 'rarity', 'price', 'high alch']
+INFO:utils.osrs_wiki_sync_service:Found potential drop table with headers: ['', 'item', 'quantity', 'rarity', 'price', 'high alch']
+WARNING:utils.osrs_wiki_sync_service:Could not parse quantity: N/A
+WARNING:utils.osrs_wiki_sync_service:Unknown item ID for: Nothing
+WARNING:utils.osrs_wiki_sync_service:Unknown item ID for: Nothing
+INFO:utils.osrs_wiki_sync_service:Found potential drop table with headers: ['', 'item', 'quantity', 'rarity', 'price', 'high alch']
+INFO:utils.ge_api:Fetching price for item 1631 from OSRS Wiki API
+INFO:utils.ge_api:Successfully fetched price for item 1631: {'high': 16285, 'highTime': 1748117197, 'low': 16200, 'lowTime': 1748117827}
+INFO:utils.ge_api:Fetching price for item 4101 from OSRS Wiki API
+INFO:utils.ge_api:Successfully fetched price for item 4101: {'high': 72620, 'highTime': 1748117497, 'low': 71100, 'lowTime': 1748117800}
+INFO:utils.ge_api:Fetching price for item 1073 from OSRS Wiki API
+INFO:utils.ge_api:Successfully fetched price for item 1073: {'high': 3521, 'highTime': 1748117727, 'low': 3506, 'lowTime': 1748117834}
+INFO:utils.ge_api:Fetching price for item 1149 from OSRS Wiki API
+INFO:utils.ge_api:Successfully fetched price for item 1149: {'high': 59105, 'highTime': 1748117808, 'low': 58331, 'lowTime': 1748117815}
+INFO:utils.ge_api:Fetching price for item 1319 from OSRS Wiki API
+INFO:utils.ge_api:Successfully fetched price for item 1319: {'high': 37994, 'highTime': 1748117835, 'low': 37886, 'lowTime': 1748117834}
+INFO:utils.ge_api:Fetching price for item 4129 from OSRS Wiki API
+INFO:utils.ge_api:Successfully fetched price for item 4129: {'high': 988, 'highTime': 1748117802, 'low': 929, 'lowTime': 1748117627}
+INFO:utils.ge_api:Fetching price for item 1373 from OSRS Wiki API
+INFO:utils.ge_api:Successfully fetched price for item 1373: {'high': 24539, 'highTime': 1748117834, 'low': 24539, 'lowTime': 1748117837}
+INFO:utils.ge_api:Fetching price for item 1079 from OSRS Wiki API
+INFO:utils.ge_api:Successfully fetched price for item 1079: {'high': 38199, 'highTime': 1748117834, 'low': 37898, 'lowTime': 1748117836}
+INFO:utils.ge_api:Fetching price for item 554 from OSRS Wiki API
+INFO:utils.ge_api:Successfully fetched price for item 554: {'high': 5, 'highTime': 1748117829, 'low': 5, 'lowTime': 1748117725}
+INFO:utils.ge_api:Fetching price for item 562 from OSRS Wiki API
+INFO:utils.ge_api:Successfully fetched price for item 562: {'high': 103, 'highTime': 1748117829, 'low': 102, 'lowTime': 1748117835}
+INFO:utils.ge_api:Cache hit for item 554
+INFO:utils.ge_api:Fetching price for item 560 from OSRS Wiki API
+INFO:utils.ge_api:Successfully fetched price for item 560: {'high': 148, 'highTime': 1748117797, 'low': 149, 'lowTime': 1748117835}
+INFO:utils.ge_api:Fetching price for item 444 from OSRS Wiki API
+INFO:utils.ge_api:Successfully fetched price for item 444: {'high': 138, 'highTime': 1748117658, 'low': 139, 'lowTime': 1748117827}
+INFO:utils.ge_api:Fetching price for item 7936 from OSRS Wiki API
+INFO:utils.ge_api:Successfully fetched price for item 7936: {'high': 1, 'highTime': 1748117840, 'low': 2, 'lowTime': 1748074201}
+INFO:utils.ge_api:Fetching price for item 2353 from OSRS Wiki API
+INFO:utils.ge_api:Successfully fetched price for item 2353: {'high': 509, 'highTime': 1748117791, 'low': 507, 'lowTime': 1748117840}
+INFO:utils.ge_api:Fetching price for item 2357 from OSRS Wiki API
+INFO:utils.ge_api:Successfully fetched price for item 2357: {'high': 135, 'highTime': 1748117826, 'low': 128, 'lowTime': 1748117840}
+INFO:utils.ge_api:Fetching price for item 2359 from OSRS Wiki API
+INFO:utils.ge_api:Successfully fetched price for item 2359: {'high': 727, 'highTime': 1748117835, 'low': 727, 'lowTime': 1748117835}
+INFO:utils.ge_api:Fetching price for item 451 from OSRS Wiki API
+INFO:utils.ge_api:Successfully fetched price for item 451: {'high': 10571, 'highTime': 1748117802, 'low': 10506, 'lowTime': 1748117836}
+INFO:utils.ge_api:Fetching price for item 995 from OSRS Wiki API
+WARNING:utils.ge_api:No price data found for item 995
+WARNING:utils.osrs_wiki_sync_service:Using fallback price for item 995: 1
+INFO:utils.ge_api:Fetching price for item 995 from OSRS Wiki API
+WARNING:utils.ge_api:No price data found for item 995
+WARNING:utils.osrs_wiki_sync_service:Using fallback price for item 995: 1
+INFO:utils.ge_api:Fetching price for item 995 from OSRS Wiki API
+WARNING:utils.ge_api:No price data found for item 995
+WARNING:utils.osrs_wiki_sync_service:Using fallback price for item 995: 1
+INFO:utils.ge_api:Fetching price for item 1623 from OSRS Wiki API
+INFO:utils.ge_api:Successfully fetched price for item 1623: {'high': 269, 'highTime': 1748117838, 'low': 267, 'lowTime': 1748117816}
+INFO:utils.ge_api:Fetching price for item 1621 from OSRS Wiki API
+INFO:utils.ge_api:Successfully fetched price for item 1621: {'high': 411, 'highTime': 1748117814, 'low': 403, 'lowTime': 1748117834}
+INFO:utils.ge_api:Fetching price for item 1619 from OSRS Wiki API
+INFO:utils.ge_api:Successfully fetched price for item 1619: {'high': 936, 'highTime': 1748117303, 'low': 928, 'lowTime': 1748117838}
+INFO:utils.ge_api:Fetching price for item 1617 from OSRS Wiki API
+INFO:utils.ge_api:Successfully fetched price for item 1617: {'high': 2233, 'highTime': 1748117810, 'low': 2227, 'lowTime': 1748117843}
+INFO:utils.ge_api:Fetching price for item 1452 from OSRS Wiki API
+INFO:utils.ge_api:Successfully fetched price for item 1452: {'high': 3000, 'highTime': 1748117479, 'low': 1650, 'lowTime': 1748117830}
+INFO:utils.ge_api:Fetching price for item 1462 from OSRS Wiki API
+INFO:utils.ge_api:Successfully fetched price for item 1462: {'high': 317, 'highTime': 1748117135, 'low': 320, 'lowTime': 1748117844}
+INFO:utils.ge_api:Fetching price for item 985 from OSRS Wiki API
+INFO:utils.ge_api:Successfully fetched price for item 985: {'high': 10737, 'highTime': 1748117813, 'low': 10737, 'lowTime': 1748117843}
+INFO:utils.ge_api:Fetching price for item 987 from OSRS Wiki API
+INFO:utils.ge_api:Successfully fetched price for item 987: {'high': 11449, 'highTime': 1748117759, 'low': 10500, 'lowTime': 1748117798}
+INFO:utils.ge_api:Fetching price for item 830 from OSRS Wiki API
+INFO:utils.ge_api:Successfully fetched price for item 830: {'high': 135, 'highTime': 1748117770, 'low': 135, 'lowTime': 1748117843}
+INFO:utils.ge_api:Fetching price for item 1247 from OSRS Wiki API
+INFO:utils.ge_api:Successfully fetched price for item 1247: {'high': 12863, 'highTime': 1748117484, 'low': 11832, 'lowTime': 1748117821}
+INFO:utils.ge_api:Fetching price for item 2366 from OSRS Wiki API
+INFO:utils.ge_api:Successfully fetched price for item 2366: {'high': 66666, 'highTime': 1748117825, 'low': 65045, 'lowTime': 1748117830}
+INFO:utils.ge_api:Fetching price for item 1249 from OSRS Wiki API
+INFO:utils.ge_api:Successfully fetched price for item 1249: {'high': 37952, 'highTime': 1748117673, 'low': 37519, 'lowTime': 1748117636}
+INFO:utils.ge_api:Fetching price for item 22520 from OSRS Wiki API
+WARNING:utils.ge_api:No price data found for item 22520
+WARNING:utils.osrs_wiki_sync_service:Using fallback price for item 22520: 100
+INFO:utils.ge_api:Fetching price for item 2722 from OSRS Wiki API
+WARNING:utils.ge_api:No price data found for item 2722
+WARNING:utils.osrs_wiki_sync_service:Using fallback price for item 2722: 100
+INFO:utils.ge_api:Fetching price for item 22557 from OSRS Wiki API
+INFO:utils.ge_api:Successfully fetched price for item 22557: {'high': 328999, 'highTime': 1748117812, 'low': 322337, 'lowTime': 1748117773}
+Testing Gargoyle drop table parsing...
+Successfully fetched Gargoyle page
+Parsed 36 total drops
+common: 36 items
+  - Item 1631: [1, 1] @ 0.003906
+  - Item 4101: [1, 1] @ 0.001953
+  - Item 1073: [1, 1] @ 0.031250
+  - Item 1149: [1, 1] @ 0.023438
+  - Item 1319: [1, 1] @ 0.015625
+Expected loot value: 6167.42 GP per kill

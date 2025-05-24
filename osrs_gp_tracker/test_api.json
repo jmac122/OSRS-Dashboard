@@ -1,0 +1,12 @@
+{
+  "activity_type": "farming",
+  "params": {
+    "seed_id": 5295,
+    "herb_id": 207,
+    "avg_yield_per_patch": 8,
+    "num_patches": 9,
+    "growth_time_minutes": 80,
+    "compost_id": 21483
+  },
+  "user_id": "test"
+} 

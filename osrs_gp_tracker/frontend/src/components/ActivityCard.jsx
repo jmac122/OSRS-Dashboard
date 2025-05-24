@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { calculateGpHr } from '../services/api';
+import { calculateGpHr, getSlayerMasters, getSlayerBreakdown } from '../services/api';
 import { useUserConfig } from '../context/UserConfigContext';
 import GPChart from './GPChart';
 
@@ -11,6 +11,9 @@ const ActivityCard = ({ title, activityType, userId }) => {
   const [localParams, setLocalParams] = useState({});
   const [hasChanges, setHasChanges] = useState(false);
   const [hasInitiallyCalculated, setHasInitiallyCalculated] = useState(false);
+  const [slayerMasters, setSlayerMasters] = useState({});
+  const [slayerBreakdown, setSlayerBreakdown] = useState(null);
+  const [loadingBreakdown, setLoadingBreakdown] = useState(false);
 
   // Get current activity config
   const activityConfig = userConfig[activityType] || {};
@@ -28,6 +31,23 @@ const ActivityCard = ({ title, activityType, userId }) => {
       setHasInitiallyCalculated(true);
     }
   }, [localParams, userId, hasInitiallyCalculated]);
+
+  // Load Slayer Masters when activity type is slayer
+  useEffect(() => {
+    if (activityType === 'slayer') {
+      const loadSlayerMasters = async () => {
+        try {
+          const mastersData = await getSlayerMasters();
+          if (mastersData.success && mastersData.items) {
+            setSlayerMasters(mastersData.items.masters || {});
+          }
+        } catch (error) {
+          console.error('Failed to load Slayer Masters:', error);
+        }
+      };
+      loadSlayerMasters();
+    }
+  }, [activityType]);
 
   const calculateGpHour = async () => {
     try {
@@ -50,6 +70,7 @@ const ActivityCard = ({ title, activityType, userId }) => {
       if (response.success) {
         setResult(response.result);
         setHasChanges(false);
+        loadSlayerBreakdown();
       } else {
         setError(response.error || 'Calculation failed');
       }
@@ -57,6 +78,37 @@ const ActivityCard = ({ title, activityType, userId }) => {
       setError(err.message || 'Failed to calculate GP/hour');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadSlayerBreakdown = async () => {
+    if (activityType !== 'slayer' || !localParams.slayer_master_id) return;
+    
+    try {
+      setLoadingBreakdown(true);
+      const userLevels = {
+        slayer_level: parseInt(localParams.user_slayer_level) || 85,
+        combat_level: parseInt(localParams.user_combat_level) || 100,
+        attack_level: parseInt(localParams.user_attack_level) || 80,
+        strength_level: parseInt(localParams.user_strength_level) || 80,
+        defence_level: parseInt(localParams.user_defence_level) || 75,
+        ranged_level: parseInt(localParams.user_ranged_level) || 85,
+        magic_level: parseInt(localParams.user_magic_level) || 80,
+      };
+      
+      const breakdown = await getSlayerBreakdown(
+        localParams.slayer_master_id,
+        userLevels,
+        userId
+      );
+      
+      if (breakdown.success) {
+        setSlayerBreakdown(breakdown.result);
+      }
+    } catch (error) {
+      console.error('Failed to load Slayer breakdown:', error);
+    } finally {
+      setLoadingBreakdown(false);
     }
   };
 
@@ -69,6 +121,19 @@ const ActivityCard = ({ title, activityType, userId }) => {
     setHasChanges(true);
     // Save to user config but don't trigger calculation
     await updateUserConfig(activityType, { [paramName]: processedValue });
+    
+    // For Slayer, load breakdown when master or key levels change
+    if (activityType === 'slayer' && 
+        (paramName === 'slayer_master_id' || 
+         paramName === 'user_slayer_level' || 
+         paramName === 'user_combat_level')) {
+      // Use updated params for breakdown
+      const tempParams = { ...localParams, [paramName]: processedValue };
+      if (tempParams.slayer_master_id) {
+        // Small delay to ensure state is updated
+        setTimeout(() => loadSlayerBreakdown(), 100);
+      }
+    }
   };
 
   // Validation function to check if all required fields have values
@@ -76,11 +141,33 @@ const ActivityCard = ({ title, activityType, userId }) => {
     const requiredFields = getRequiredFields();
     const emptyFields = [];
     
-    for (const field of requiredFields) {
-      const value = localParams[field];
+    // Helper function to get actual value (including defaults) for validation
+    const getValidationValue = (paramName) => {
+      const value = localParams[paramName];
+      if (value !== undefined && value !== null) {
+        return value;
+      }
       
-      if (field === 'monster_name') {
-        // For text fields, just check if it's empty or whitespace
+      // Return appropriate default values for each field
+      const defaults = {
+        'slayer_master_id': 'nieve',
+        'user_slayer_level': 85,
+        'user_combat_level': 100,
+        'user_attack_level': 80,
+        'user_strength_level': 80,
+        'user_defence_level': 75,
+        'user_ranged_level': 85,
+        'user_magic_level': 80
+      };
+      
+      return defaults[paramName] || '';
+    };
+    
+    for (const field of requiredFields) {
+      const value = getValidationValue(field);
+      
+      if (field === 'monster_name' || field === 'slayer_master_id') {
+        // For text/string fields, just check if it's empty or whitespace
         if (!value || value.toString().trim() === '') {
           emptyFields.push(field);
         }
@@ -105,7 +192,7 @@ const ActivityCard = ({ title, activityType, userId }) => {
       case 'gotr':
         return ['games_per_hour', 'essence_per_game', 'avg_rune_value_per_game', 'avg_pearl_value_per_game'];
       case 'slayer':
-        return ['monster_name', 'kills_per_hour', 'avg_loot_value_per_kill', 'avg_supply_cost_per_hour'];
+        return ['slayer_master_id', 'user_slayer_level', 'user_combat_level'];
       default:
         return [];
     }
@@ -320,56 +407,189 @@ const ActivityCard = ({ title, activityType, userId }) => {
       
       case 'slayer':
         return (
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-amber-800 mb-1">
-                Monster Name
-              </label>
-              <input
-                type="text"
-                value={getInputValue('monster_name', 'Rune Dragons')}
-                onChange={(e) => handleParamChange('monster_name', e.target.value)}
-                className="osrs-input w-full"
-              />
+          <div className="space-y-6">
+            {/* Slayer Master Selection */}
+            <div className="bg-white p-4 rounded-lg border-2 border-amber-200">
+              <h4 className="text-lg font-semibold text-amber-800 mb-3">🎯 Slayer Master</h4>
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-amber-800 mb-2">
+                    Select Slayer Master
+                  </label>
+                  <select
+                    value={getInputValue('slayer_master_id', 'nieve')}
+                    onChange={(e) => handleParamChange('slayer_master_id', e.target.value)}
+                    className="osrs-input w-full"
+                  >
+                    {Object.keys(slayerMasters).length > 0 ? (
+                      Object.entries(slayerMasters).map(([masterId, masterData]) => (
+                        <option key={masterId} value={masterId}>
+                          {masterData.name} ({masterData.combat_req}+ Combat, {masterData.location})
+                        </option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="nieve">Nieve (85+ Combat, Tree Gnome Stronghold)</option>
+                        <option value="duradel">Duradel (100+ Combat, 50+ Slayer, Shilo Village)</option>
+                        <option value="chaeldar">Chaeldar (70+ Combat, Zanaris)</option>
+                        <option value="vannaka">Vannaka (40+ Combat, Edgeville Dungeon)</option>
+                        <option value="mazchna">Mazchna (20+ Combat, Canifis)</option>
+                        <option value="turael">Turael (Any Level, Burthorpe)</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-amber-800 mb-1">
-                Kills/Hour
-              </label>
-              <input
-                type="number"
-                value={getInputValue('kills_per_hour', 40)}
-                onChange={(e) => handleParamChange('kills_per_hour', e.target.value)}
-                className="osrs-input w-full"
-                min="1"
-                max="1000"
-              />
+
+            {/* User Skill Levels */}
+            <div className="bg-white p-4 rounded-lg border-2 border-amber-200">
+              <h4 className="text-lg font-semibold text-amber-800 mb-3">⚔️ Your Skill Levels</h4>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-amber-800 mb-1">
+                    Slayer Level
+                  </label>
+                  <input
+                    type="number"
+                    value={getInputValue('user_slayer_level', 85)}
+                    onChange={(e) => handleParamChange('user_slayer_level', e.target.value)}
+                    className="osrs-input w-full"
+                    min="1"
+                    max="99"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-amber-800 mb-1">
+                    Combat Level
+                  </label>
+                  <input
+                    type="number"
+                    value={getInputValue('user_combat_level', 100)}
+                    onChange={(e) => handleParamChange('user_combat_level', e.target.value)}
+                    className="osrs-input w-full"
+                    min="3"
+                    max="126"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-amber-800 mb-1">
+                    Attack Level
+                  </label>
+                  <input
+                    type="number"
+                    value={getInputValue('user_attack_level', 80)}
+                    onChange={(e) => handleParamChange('user_attack_level', e.target.value)}
+                    className="osrs-input w-full"
+                    min="1"
+                    max="99"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-amber-800 mb-1">
+                    Strength Level
+                  </label>
+                  <input
+                    type="number"
+                    value={getInputValue('user_strength_level', 80)}
+                    onChange={(e) => handleParamChange('user_strength_level', e.target.value)}
+                    className="osrs-input w-full"
+                    min="1"
+                    max="99"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-amber-800 mb-1">
+                    Defence Level
+                  </label>
+                  <input
+                    type="number"
+                    value={getInputValue('user_defence_level', 75)}
+                    onChange={(e) => handleParamChange('user_defence_level', e.target.value)}
+                    className="osrs-input w-full"
+                    min="1"
+                    max="99"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-amber-800 mb-1">
+                    Ranged Level
+                  </label>
+                  <input
+                    type="number"
+                    value={getInputValue('user_ranged_level', 85)}
+                    onChange={(e) => handleParamChange('user_ranged_level', e.target.value)}
+                    className="osrs-input w-full"
+                    min="1"
+                    max="99"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-amber-800 mb-1">
+                    Magic Level
+                  </label>
+                  <input
+                    type="number"
+                    value={getInputValue('user_magic_level', 80)}
+                    onChange={(e) => handleParamChange('user_magic_level', e.target.value)}
+                    className="osrs-input w-full"
+                    min="1"
+                    max="99"
+                  />
+                </div>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-amber-800 mb-1">
-                Loot/Kill
-              </label>
-              <input
-                type="number"
-                value={getInputValue('avg_loot_value_per_kill', 37000)}
-                onChange={(e) => handleParamChange('avg_loot_value_per_kill', e.target.value)}
-                className="osrs-input w-full"
-                min="100"
-                max="1000000"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-amber-800 mb-1">
-                Supply Cost/Hour
-              </label>
-              <input
-                type="number"
-                value={getInputValue('avg_supply_cost_per_hour', 100000)}
-                onChange={(e) => handleParamChange('avg_supply_cost_per_hour', e.target.value)}
-                className="osrs-input w-full"
-                min="0"
-                max="1000000"
-              />
+
+            {/* Quick Level Presets */}
+            <div className="bg-amber-50 p-3 rounded-lg border border-amber-200">
+              <h5 className="text-sm font-semibold text-amber-800 mb-2">⚡ Quick Presets</h5>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => {
+                    // Low-level preset
+                    handleParamChange('user_slayer_level', 70);
+                    handleParamChange('user_combat_level', 85);
+                    handleParamChange('user_attack_level', 70);
+                    handleParamChange('user_strength_level', 70);
+                    handleParamChange('user_defence_level', 60);
+                    handleParamChange('user_ranged_level', 75);
+                    handleParamChange('user_magic_level', 70);
+                  }}
+                  className="text-xs px-3 py-1 bg-amber-200 hover:bg-amber-300 rounded-md text-amber-800 font-medium"
+                >
+                  Mid-Level (70s)
+                </button>
+                <button
+                  onClick={() => {
+                    // High-level preset
+                    handleParamChange('user_slayer_level', 90);
+                    handleParamChange('user_combat_level', 115);
+                    handleParamChange('user_attack_level', 90);
+                    handleParamChange('user_strength_level', 90);
+                    handleParamChange('user_defence_level', 85);
+                    handleParamChange('user_ranged_level', 95);
+                    handleParamChange('user_magic_level', 85);
+                  }}
+                  className="text-xs px-3 py-1 bg-amber-200 hover:bg-amber-300 rounded-md text-amber-800 font-medium"
+                >
+                  High-Level (90s)
+                </button>
+                <button
+                  onClick={() => {
+                    // Maxed preset
+                    handleParamChange('user_slayer_level', 99);
+                    handleParamChange('user_combat_level', 126);
+                    handleParamChange('user_attack_level', 99);
+                    handleParamChange('user_strength_level', 99);
+                    handleParamChange('user_defence_level', 99);
+                    handleParamChange('user_ranged_level', 99);
+                    handleParamChange('user_magic_level', 99);
+                  }}
+                  className="text-xs px-3 py-1 bg-amber-200 hover:bg-amber-300 rounded-md text-amber-800 font-medium"
+                >
+                  Maxed (99s)
+                </button>
+              </div>
             </div>
           </div>
         );
@@ -424,6 +644,74 @@ const ActivityCard = ({ title, activityType, userId }) => {
         <h3 className="text-lg font-semibold text-amber-800 mb-3">Parameters</h3>
         {renderActivitySpecificInputs()}
       </div>
+
+      {/* Slayer Breakdown - only show for slayer activity */}
+      {activityType === 'slayer' && slayerBreakdown && (
+        <div className="mb-6 bg-amber-50 p-4 rounded-lg">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-semibold text-amber-800">📋 Task Assignments</h3>
+            {loadingBreakdown && (
+              <div className="text-sm text-amber-600">Loading assignments...</div>
+            )}
+          </div>
+          
+          {slayerBreakdown.assignments && slayerBreakdown.assignments.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {slayerBreakdown.assignments.map((assignment, index) => (
+                <div key={index} className="bg-white p-3 rounded border">
+                  <div className="flex justify-between items-start mb-2">
+                    <h4 className="font-medium text-amber-800">{assignment.monster_name}</h4>
+                    <span className="text-sm text-gray-600">{(assignment.probability * 100).toFixed(1)}%</span>
+                  </div>
+                  <div className="text-sm space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">GP/Task:</span>
+                      <span className="font-medium">{formatNumber(assignment.gp_per_task || 0)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">GP/Hour:</span>
+                      <span className="font-medium text-green-600">{formatNumber(assignment.gp_per_hour || 0)}</span>
+                    </div>
+                    {assignment.requirements && (
+                      <div className="text-xs text-amber-600 mt-1">
+                        Req: {assignment.requirements}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center text-amber-600 py-4">
+              {loadingBreakdown ? 'Loading task assignments...' : 'No assignments available for selected master and levels.'}
+            </div>
+          )}
+          
+          {slayerBreakdown.overall && (
+            <div className="mt-4 bg-white p-3 rounded border">
+              <h4 className="font-medium text-amber-800 mb-2">📊 Overall Summary</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div className="text-center">
+                  <div className="text-gray-600">Avg GP/Task</div>
+                  <div className="font-bold text-amber-700">{formatNumber(slayerBreakdown.overall.avg_gp_per_task || 0)}</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-gray-600">Tasks/Hour</div>
+                  <div className="font-bold text-amber-700">{(slayerBreakdown.overall.tasks_per_hour || 0).toFixed(2)}</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-gray-600">Expected GP/Hr</div>
+                  <div className="font-bold text-green-600">{formatNumber(slayerBreakdown.overall.expected_gp_per_hour || 0)}</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-gray-600">Available Tasks</div>
+                  <div className="font-bold text-amber-700">{slayerBreakdown.overall.available_tasks || 0}</div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Calculate Button */}
       <div className="text-center mb-6">

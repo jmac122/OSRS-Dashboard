@@ -4,53 +4,48 @@ import { auth, signInAnonymouslyUser } from './services/firebase';
 import { UserConfigProvider } from './context/UserConfigContext';
 import Navbar from './components/Navbar';
 import ActivityCard from './components/ActivityCard';
+import ActivityComparison from './components/ActivityComparison';
 import ConfigEditor from './components/ConfigEditor';
 import { healthCheck } from './services/api';
 
 function App() {
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState('farming');
-  const [loading, setLoading] = useState(true);
-  const [backendStatus, setBackendStatus] = useState(null);
+  const [backendStatus, setBackendStatus] = useState('checking');
 
-  // Initialize Firebase Auth
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setUser(user);
+    const checkBackend = async () => {
+      try {
+        const result = await healthCheck();
+        setBackendStatus(result.firebase_connected ? 'connected' : 'firebase-error');
+      } catch (error) {
+        setBackendStatus('disconnected');
+      }
+    };
+    checkBackend();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (currentUser) {
+        setUser(currentUser);
       } else {
-        // Sign in anonymously if no user
         signInAnonymouslyUser()
-          .then((user) => {
-            setUser(user);
+          .then((userCredential) => {
+            setUser(userCredential.user);
           })
           .catch((error) => {
-            console.error('Error signing in anonymously:', error);
+            console.error('Authentication failed:', error);
           });
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
 
-  // Check backend health
-  useEffect(() => {
-    const checkBackend = async () => {
-      try {
-        const status = await healthCheck();
-        setBackendStatus(status);
-      } catch (error) {
-        console.error('Backend health check failed:', error);
-        setBackendStatus({ status: 'unhealthy', error: error.message });
-      }
-    };
-
-    checkBackend();
-  }, []);
-
   const renderContent = () => {
     switch (activeTab) {
+      // Single Activity Cases (existing functionality)
       case 'farming':
         return (
           <ActivityCard
@@ -83,78 +78,94 @@ function App() {
             userId={user?.uid}
           />
         );
+
+      // Comparison Cases (new functionality)
+      case 'compare-farming':
+        return (
+          <ActivityComparison
+            activityType="farming"
+            userId={user?.uid}
+          />
+        );
+      case 'compare-birdhouse':
+        return (
+          <ActivityComparison
+            activityType="birdhouse"
+            userId={user?.uid}
+          />
+        );
+      case 'compare-gotr':
+        return (
+          <ActivityComparison
+            activityType="gotr"
+            userId={user?.uid}
+          />
+        );
+      case 'compare-slayer':
+        return (
+          <ActivityComparison
+            activityType="slayer"
+            userId={user?.uid}
+          />
+        );
+
+      // Configuration Case (existing functionality)
       case 'config':
-        return <ConfigEditor />;
+        return <ConfigEditor userId={user?.uid} />;
+      
       default:
         return (
           <div className="osrs-card p-6 max-w-4xl mx-auto">
             <h2 className="text-2xl font-bold text-amber-800 text-center">
-              Welcome to OSRS GP/Hour Tracker
+              Welcome to OSRS GP/Hour Tracker! 🎉
             </h2>
             <p className="text-amber-700 text-center mt-4">
-              Select an activity from the navigation to get started!
+              Track your Old School RuneScape activities and compare profitability.
             </p>
+            <div className="mt-6 text-center">
+              <p className="text-gray-600 mb-4">Choose an activity from the navigation above to get started.</p>
+              <div className="bg-amber-50 p-4 rounded-lg">
+                <h3 className="font-bold text-amber-800 mb-2">New in Phase 1: Comparison Mode!</h3>
+                <p className="text-amber-700 text-sm">
+                  Use the "Compare" tabs to analyze multiple options side-by-side and find the most profitable activities.
+                </p>
+              </div>
+            </div>
           </div>
         );
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-amber-50 to-amber-100 flex items-center justify-center">
-        <div className="osrs-card p-8">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-amber-800 mb-4">
-              🏰 Loading OSRS GP Tracker...
-            </div>
-            <div className="text-amber-700">Initializing user session...</div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const getStatusIndicator = () => {
+    switch (backendStatus) {
+      case 'connected':
+        return <span className="text-green-600">🟢 Connected</span>;
+      case 'firebase-error':
+        return <span className="text-yellow-600">🟡 Backend OK, Firebase Issue</span>;
+      case 'disconnected':
+        return <span className="text-red-600">🔴 Backend Disconnected</span>;
+      default:
+        return <span className="text-gray-600">⏳ Checking...</span>;
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 to-amber-100">
-      <UserConfigProvider userId={user?.uid}>
+    <UserConfigProvider>
+      <div className="min-h-screen bg-gradient-to-b from-amber-50 to-orange-100">
         <Navbar activeTab={activeTab} setActiveTab={setActiveTab} />
         
-        {/* Backend Status Indicator */}
-        {backendStatus && (
-          <div className="max-w-7xl mx-auto px-4 mb-4">
-            <div className={`p-2 rounded-lg text-sm text-center ${
-              backendStatus.status === 'healthy' 
-                ? 'bg-green-100 text-green-700' 
-                : 'bg-red-100 text-red-700'
-            }`}>
-              Backend: {backendStatus.status} 
-              {backendStatus.firebase_connected !== undefined && 
-                ` | Firebase: ${backendStatus.firebase_connected ? 'Connected' : 'Disconnected'}`
-              }
-              {backendStatus.error && ` | Error: ${backendStatus.error}`}
-            </div>
+        <div className="container mx-auto px-4 py-6">
+          {/* Status Bar */}
+          <div className="mb-4 text-center text-sm">
+            Backend: {getStatusIndicator()}
+            {user && <span className="ml-4 text-gray-600">User: {user.uid.slice(-6)}</span>}
           </div>
-        )}
 
-        <main className="max-w-7xl mx-auto px-4 py-6">
+          {/* Main Content */}
           {renderContent()}
-        </main>
-
-        {/* Footer */}
-        <footer className="bg-amber-800 text-white py-4 mt-12">
-          <div className="max-w-7xl mx-auto px-4 text-center">
-            <p className="text-sm">
-              OSRS GP/Hour Tracker - Built for Old School RuneScape players
-            </p>
-            <p className="text-xs mt-1 opacity-75">
-              User ID: {user?.uid?.substring(0, 8)}... | 
-              Prices from OSRS Wiki API | 
-              Data saved to Firebase
-            </p>
-          </div>
-        </footer>
-      </UserConfigProvider>
-    </div>
+        </div>
+      </div>
+    </UserConfigProvider>
   );
 }
 
