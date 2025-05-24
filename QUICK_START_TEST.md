@@ -53,14 +53,22 @@ Open your browser and test these URLs:
 
 ### Test 2: Activity Calculations  
 1. Go to **Farming** page
-2. ✅ Verify default parameters are loaded
+2. ✅ Verify default parameters are loaded and initial calculation shows
 3. ✅ Change a parameter (e.g., patches to 10)  
-4. ✅ Click "Calculate GP/Hour" button
-5. ✅ Verify you see:
+4. ✅ Verify calculation does NOT update automatically (optimized behavior)
+5. ✅ Click "Calculate GP/Hour" button  
+6. ✅ Verify you see updated results:
    - GP/Hr amount (should be ~300k+)
-   - Yellow bar chart  
+   - Yellow bar chart updates 
    - Breakdown section with costs/revenue
    - Current market prices
+
+### Test 2.5: Input Field Functionality ⭐ NEW
+1. ✅ Try to backspace and clear any numeric field completely
+2. ✅ Verify you can clear the field to empty (no forced 0)
+3. ✅ Type a new value from scratch (e.g., clear patches and type "12")
+4. ✅ Try to calculate with empty fields - should show validation error
+5. ✅ Fill all fields and calculate - should work normally
 
 ### Test 3: All Activity Types
 Repeat Test 2 for each activity:
@@ -68,11 +76,12 @@ Repeat Test 2 for each activity:
 - **GOTR:** Should calculate ~200k+/hr  
 - **Slayer:** Should calculate ~1M+/hr (Rune Dragons)
 
-### Test 4: Visual Elements
-1. ✅ All text is clearly visible (no white text on white background)
+### Test 4: Performance & Visual Elements
+1. ✅ Parameter changes are instant (no API delays while typing)
 2. ✅ "Recalculate" button appears when changing parameters
-3. ✅ Charts display properly with yellow bars
-4. ✅ Breakdown sections show formatted numbers
+3. ✅ Charts only update when button is clicked (not on every keystroke)
+4. ✅ All text is clearly visible (no white text on white background)
+5. ✅ Breakdown sections show formatted numbers
 
 ---
 

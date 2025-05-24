@@ -7,6 +7,38 @@
 
 ---
 
+## ⚡ **RECENT PERFORMANCE OPTIMIZATION**
+
+### API Request Optimization ✅ IMPLEMENTED
+- **Issue:** Too many API requests triggered on every parameter change
+- **Solution:** Modified calculation logic to only run when "Calculate GP/Hour" button is clicked
+- **Benefits:**
+  - **Reduced API Load:** No unnecessary calculations while typing/adjusting parameters
+  - **Improved Performance:** Faster UI response when changing values
+  - **Better UX:** Users control when calculations happen
+  - **Maintained Functionality:** Initial load still auto-calculates, button feedback still works
+
+### Input Field Bug Fix ✅ IMPLEMENTED  
+- **Issue:** Users couldn't backspace to clear input fields (forced to use arrows)
+- **Root Cause:** Code immediately converted empty values to 0, preventing empty states
+- **Solution:** 
+  - Allow empty field values in UI state
+  - Added field validation before calculation 
+  - Convert to numbers only when sending to API
+  - Show helpful error messages for missing required fields
+
+### Technical Changes Made:
+- Added `hasInitiallyCalculated` state to track first calculation
+- Modified `useEffect` to only auto-calculate on initial component load
+- Removed auto-calculation triggers on parameter changes
+- Kept parameter persistence and change tracking for UI feedback
+- **NEW:** Enhanced `handleParamChange` to preserve empty values
+- **NEW:** Added `validateParams()` function with field-specific validation
+- **NEW:** Added `getInputValue()` helper for proper input display
+- **NEW:** Updated `calculateGpHour()` to convert values before API calls
+
+---
+
 ## ✅ **INFRASTRUCTURE STATUS** 
 
 ### Backend Health Check

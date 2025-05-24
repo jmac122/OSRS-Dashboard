@@ -10,6 +10,7 @@ const ActivityCard = ({ title, activityType, userId }) => {
   const [error, setError] = useState(null);
   const [localParams, setLocalParams] = useState({});
   const [hasChanges, setHasChanges] = useState(false);
+  const [hasInitiallyCalculated, setHasInitiallyCalculated] = useState(false);
 
   // Get current activity config
   const activityConfig = userConfig[activityType] || {};
@@ -20,19 +21,31 @@ const ActivityCard = ({ title, activityType, userId }) => {
     setHasChanges(false);
   }, [activityConfig]);
 
-  // Auto-calculate GP/hour when component loads (but not on every change)
+  // Only auto-calculate GP/hour on initial load, not on parameter changes
   useEffect(() => {
-    if (Object.keys(localParams).length > 0 && !hasChanges) {
+    if (Object.keys(localParams).length > 0 && !hasInitiallyCalculated) {
       calculateGpHour();
+      setHasInitiallyCalculated(true);
     }
-  }, [localParams, userId]);
+  }, [localParams, userId, hasInitiallyCalculated]);
 
   const calculateGpHour = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      const response = await calculateGpHr(activityType, localParams, userId);
+      // Convert localParams to numeric values for API call
+      const numericParams = {};
+      for (const [key, value] of Object.entries(localParams)) {
+        if (key === 'monster_name') {
+          numericParams[key] = value || 'Unknown Monster';
+        } else {
+          // Convert to number, use 0 as fallback for empty values during calculation
+          numericParams[key] = parseFloat(value) || 0;
+        }
+      }
+      
+      const response = await calculateGpHr(activityType, numericParams, userId);
       
       if (response.success) {
         setResult(response.result);
@@ -48,20 +61,86 @@ const ActivityCard = ({ title, activityType, userId }) => {
   };
 
   const handleParamChange = async (paramName, value) => {
-    const numValue = paramName === 'monster_name' ? value : (parseFloat(value) || 0);
-    const updatedParams = { ...localParams, [paramName]: numValue };
+    // Allow empty values for better UX, don't force to 0 immediately
+    const processedValue = paramName === 'monster_name' ? value : value;
+    const updatedParams = { ...localParams, [paramName]: processedValue };
     
     setLocalParams(updatedParams);
     setHasChanges(true);
-    await updateUserConfig(activityType, { [paramName]: numValue });
+    // Save to user config but don't trigger calculation
+    await updateUserConfig(activityType, { [paramName]: processedValue });
+  };
+
+  // Validation function to check if all required fields have values
+  const validateParams = () => {
+    const requiredFields = getRequiredFields();
+    const emptyFields = [];
+    
+    for (const field of requiredFields) {
+      const value = localParams[field];
+      
+      if (field === 'monster_name') {
+        // For text fields, just check if it's empty or whitespace
+        if (!value || value.toString().trim() === '') {
+          emptyFields.push(field);
+        }
+      } else {
+        // For numeric fields, check if it's empty or not a valid number
+        if (value === '' || value === null || value === undefined || isNaN(parseFloat(value))) {
+          emptyFields.push(field);
+        }
+      }
+    }
+    
+    return emptyFields;
+  };
+
+  // Get required fields based on activity type
+  const getRequiredFields = () => {
+    switch (activityType) {
+      case 'farming':
+        return ['num_patches', 'avg_yield_per_patch', 'growth_time_minutes'];
+      case 'birdhouse':
+        return ['avg_nests_per_run', 'avg_value_per_nest', 'run_time_minutes', 'cycle_time_minutes'];
+      case 'gotr':
+        return ['games_per_hour', 'essence_per_game', 'avg_rune_value_per_game', 'avg_pearl_value_per_game'];
+      case 'slayer':
+        return ['monster_name', 'kills_per_hour', 'avg_loot_value_per_kill', 'avg_supply_cost_per_hour'];
+      default:
+        return [];
+    }
   };
 
   const handleManualCalculate = () => {
+    // Validate all required fields before calculation
+    const emptyFields = validateParams();
+    
+    if (emptyFields.length > 0) {
+      const fieldNames = emptyFields.map(field => 
+        field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+      ).join(', ');
+      setError(`Please enter values for all required fields: ${fieldNames}`);
+      setResult(null);
+      return;
+    }
+
+    // Clear any previous errors and proceed with calculation
+    setError(null);
     calculateGpHour();
   };
 
   const formatNumber = (num) => {
     return num?.toLocaleString() || '0';
+  };
+
+  // Helper function to get input value - shows empty string if user cleared it, otherwise shows value or default
+  const getInputValue = (paramName, defaultValue) => {
+    const value = localParams[paramName];
+    // If value exists and isn't empty, show it; if it's empty string (user cleared), show empty; otherwise show default
+    if (value !== undefined && value !== null) {
+      return value.toString();
+    }
+    return defaultValue.toString();
   };
 
   const getChartData = () => {
@@ -84,7 +163,7 @@ const ActivityCard = ({ title, activityType, userId }) => {
               </label>
               <input
                 type="number"
-                value={localParams.num_patches || 9}
+                value={getInputValue('num_patches', 9)}
                 onChange={(e) => handleParamChange('num_patches', e.target.value)}
                 className="osrs-input w-full"
                 min="1"
@@ -97,7 +176,7 @@ const ActivityCard = ({ title, activityType, userId }) => {
               </label>
               <input
                 type="number"
-                value={localParams.avg_yield_per_patch || 8}
+                value={getInputValue('avg_yield_per_patch', 8)}
                 onChange={(e) => handleParamChange('avg_yield_per_patch', e.target.value)}
                 className="osrs-input w-full"
                 min="1"
@@ -111,7 +190,7 @@ const ActivityCard = ({ title, activityType, userId }) => {
               </label>
               <input
                 type="number"
-                value={localParams.growth_time_minutes || 80}
+                value={getInputValue('growth_time_minutes', 80)}
                 onChange={(e) => handleParamChange('growth_time_minutes', e.target.value)}
                 className="osrs-input w-full"
                 min="1"
@@ -130,7 +209,7 @@ const ActivityCard = ({ title, activityType, userId }) => {
               </label>
               <input
                 type="number"
-                value={localParams.avg_nests_per_run || 10}
+                value={getInputValue('avg_nests_per_run', 10)}
                 onChange={(e) => handleParamChange('avg_nests_per_run', e.target.value)}
                 className="osrs-input w-full"
                 min="1"
@@ -144,7 +223,7 @@ const ActivityCard = ({ title, activityType, userId }) => {
               </label>
               <input
                 type="number"
-                value={localParams.avg_value_per_nest || 5000}
+                value={getInputValue('avg_value_per_nest', 5000)}
                 onChange={(e) => handleParamChange('avg_value_per_nest', e.target.value)}
                 className="osrs-input w-full"
                 min="100"
@@ -157,7 +236,7 @@ const ActivityCard = ({ title, activityType, userId }) => {
               </label>
               <input
                 type="number"
-                value={localParams.run_time_minutes || 5}
+                value={getInputValue('run_time_minutes', 5)}
                 onChange={(e) => handleParamChange('run_time_minutes', e.target.value)}
                 className="osrs-input w-full"
                 min="1"
@@ -170,7 +249,7 @@ const ActivityCard = ({ title, activityType, userId }) => {
               </label>
               <input
                 type="number"
-                value={localParams.cycle_time_minutes || 50}
+                value={getInputValue('cycle_time_minutes', 50)}
                 onChange={(e) => handleParamChange('cycle_time_minutes', e.target.value)}
                 className="osrs-input w-full"
                 min="30"
@@ -189,7 +268,7 @@ const ActivityCard = ({ title, activityType, userId }) => {
               </label>
               <input
                 type="number"
-                value={localParams.games_per_hour || 4}
+                value={getInputValue('games_per_hour', 4)}
                 onChange={(e) => handleParamChange('games_per_hour', e.target.value)}
                 className="osrs-input w-full"
                 min="1"
@@ -203,7 +282,7 @@ const ActivityCard = ({ title, activityType, userId }) => {
               </label>
               <input
                 type="number"
-                value={localParams.essence_per_game || 150}
+                value={getInputValue('essence_per_game', 150)}
                 onChange={(e) => handleParamChange('essence_per_game', e.target.value)}
                 className="osrs-input w-full"
                 min="50"
@@ -216,7 +295,7 @@ const ActivityCard = ({ title, activityType, userId }) => {
               </label>
               <input
                 type="number"
-                value={localParams.avg_rune_value_per_game || 15000}
+                value={getInputValue('avg_rune_value_per_game', 15000)}
                 onChange={(e) => handleParamChange('avg_rune_value_per_game', e.target.value)}
                 className="osrs-input w-full"
                 min="1000"
@@ -229,7 +308,7 @@ const ActivityCard = ({ title, activityType, userId }) => {
               </label>
               <input
                 type="number"
-                value={localParams.avg_pearl_value_per_game || 8000}
+                value={getInputValue('avg_pearl_value_per_game', 8000)}
                 onChange={(e) => handleParamChange('avg_pearl_value_per_game', e.target.value)}
                 className="osrs-input w-full"
                 min="1000"
@@ -248,7 +327,7 @@ const ActivityCard = ({ title, activityType, userId }) => {
               </label>
               <input
                 type="text"
-                value={localParams.monster_name || 'Rune Dragons'}
+                value={getInputValue('monster_name', 'Rune Dragons')}
                 onChange={(e) => handleParamChange('monster_name', e.target.value)}
                 className="osrs-input w-full"
               />
@@ -259,7 +338,7 @@ const ActivityCard = ({ title, activityType, userId }) => {
               </label>
               <input
                 type="number"
-                value={localParams.kills_per_hour || 40}
+                value={getInputValue('kills_per_hour', 40)}
                 onChange={(e) => handleParamChange('kills_per_hour', e.target.value)}
                 className="osrs-input w-full"
                 min="1"
@@ -272,7 +351,7 @@ const ActivityCard = ({ title, activityType, userId }) => {
               </label>
               <input
                 type="number"
-                value={localParams.avg_loot_value_per_kill || 37000}
+                value={getInputValue('avg_loot_value_per_kill', 37000)}
                 onChange={(e) => handleParamChange('avg_loot_value_per_kill', e.target.value)}
                 className="osrs-input w-full"
                 min="100"
@@ -285,7 +364,7 @@ const ActivityCard = ({ title, activityType, userId }) => {
               </label>
               <input
                 type="number"
-                value={localParams.avg_supply_cost_per_hour || 100000}
+                value={getInputValue('avg_supply_cost_per_hour', 100000)}
                 onChange={(e) => handleParamChange('avg_supply_cost_per_hour', e.target.value)}
                 className="osrs-input w-full"
                 min="0"
