@@ -78,7 +78,7 @@ export const healthCheck = async () => {
 
 export const getSlayerMasters = async () => {
   try {
-    const response = await api.get('/items/slayer');
+    const response = await api.get('/items/slayer?category=masters');
     return response.data;
   } catch (error) {
     console.error('Error fetching Slayer Masters:', error);
@@ -88,7 +88,7 @@ export const getSlayerMasters = async () => {
 
 export const getSlayerBreakdown = async (slayerMasterId, userLevels, userId = null) => {
   try {
-    const response = await api.post('/api/slayer/breakdown', {
+    const response = await api.post('/slayer/breakdown', {
       slayer_master_id: slayerMasterId,
       user_levels: userLevels,
       user_id: userId,

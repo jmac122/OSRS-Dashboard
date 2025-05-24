@@ -248,32 +248,45 @@ def calculate_slayer_gp_hr(params, user_params=None):
     Calculate GP/hour for slayer tasks using comprehensive master assignment data.
     
     Expected params:
+    - calculation_mode: 'expected' (default), 'specific', or 'breakdown'
     - slayer_master_id: ID of the selected slayer master ('nieve', 'duradel', etc.)
-    - user_slayer_level: User's current slayer level (default 99)
-    - user_combat_level: User's combat level (default 126)
-    - user_attack_level: User's attack level (default 99)
-    - user_strength_level: User's strength level (default 99)
-    - user_defence_level: User's defence level (default 99)
-    - user_ranged_level: User's ranged level (default 99)
-    - user_magic_level: User's magic level (default 99)
+    - specific_monster_id: (only for 'specific' mode) ID of the specific monster
+    - user_slayer_level: User's current slayer level (default 85)
+    - user_combat_level: User's combat level (default 100)
+    - user_attack_level: User's attack level (default 80)
+    - user_strength_level: User's strength level (default 80)
+    - user_defence_level: User's defence level (default 75)
+    - user_ranged_level: User's ranged level (default 85)
+    - user_magic_level: User's magic level (default 80)
     
     user_params (dict): User overrides from Firestore
     """
     try:
-        # Default parameters for maxed account
+        # Default parameters
         default_params = {
-            'slayer_master_id': 'nieve',
-            'user_slayer_level': 99,
-            'user_combat_level': 126,
-            'user_attack_level': 99,
-            'user_strength_level': 99,
-            'user_defence_level': 99,
-            'user_ranged_level': 99,
-            'user_magic_level': 99
+            'calculation_mode': 'expected',
+            'slayer_master_id': 'spria',
+            'user_slayer_level': 85,
+            'user_combat_level': 100,
+            'user_attack_level': 80,
+            'user_strength_level': 80,
+            'user_defence_level': 75,
+            'user_ranged_level': 85,
+            'user_magic_level': 80
         }
         
         calc_params = {**default_params, **params}
+        calculation_mode = calc_params.get('calculation_mode', 'expected')
         
+        # Handle specific monster calculation
+        if calculation_mode == 'specific':
+            specific_monster_id = calc_params.get('specific_monster_id')
+            if not specific_monster_id:
+                return {"error": "Specific monster ID required for specific mode", "gp_hr": 0}
+            
+            return calculate_specific_monster_gp_hr(specific_monster_id, calc_params, user_params)
+        
+        # For 'expected' and 'breakdown' modes, calculate master assignment average
         # Get master data from database
         master_data = item_db.get_global_items('slayer', 'masters')
         master_info = master_data.get(calc_params['slayer_master_id'])
@@ -351,17 +364,18 @@ def calculate_slayer_gp_hr(params, user_params=None):
                 total_weighted_gp_hr += weighted_gp_hr
                 total_probability += assignment_probability
                 
-                # Store task details for breakdown
-                task_details.append({
-                    'monster_name': monster_info.get('name', monster_slug),
-                    'assignment_probability': assignment_probability,
-                    'estimated_kph': round(estimated_kph, 1),
-                    'expected_loot_per_kill': round(expected_loot_per_kill),
-                    'avg_task_quantity': round(avg_task_quantity),
-                    'task_time_hours': round(total_task_time_hours, 2),
-                    'task_gp_hr': round(task_gp_hr),
-                    'weighted_contribution': round(weighted_gp_hr)
-                })
+                # Store task details for breakdown mode
+                if calculation_mode == 'breakdown':
+                    task_details.append({
+                        'monster_name': monster_info.get('name', monster_slug),
+                        'assignment_probability': assignment_probability,
+                        'estimated_kph': round(estimated_kph, 1),
+                        'expected_loot_per_kill': round(expected_loot_per_kill),
+                        'avg_task_quantity': round(avg_task_quantity),
+                        'task_time_hours': round(total_task_time_hours, 2),
+                        'task_gp_hr': round(task_gp_hr),
+                        'weighted_contribution': round(weighted_gp_hr)
+                    })
                 
             except Exception as e:
                 logger.error(f"Error processing monster {monster_slug}: {e}")
@@ -370,20 +384,85 @@ def calculate_slayer_gp_hr(params, user_params=None):
         # Calculate final GP/hour
         final_gp_hr = total_weighted_gp_hr / total_probability if total_probability > 0 else 0
         
-        return {
+        result = {
             "gp_hr": round(final_gp_hr),
             "master_name": master_info.get('name', 'Unknown'),
             "total_assignment_probability": round(total_probability, 3),
-            "eligible_tasks": len(task_details),
-            "task_breakdown": sorted(task_details, key=lambda x: x['weighted_contribution'], reverse=True),
+            "eligible_tasks": len([t for t in task_details if t.get('task_gp_hr', 0) > 0]),
             "user_levels": {
                 "slayer": calc_params['user_slayer_level'],
                 "combat": calc_params['user_combat_level']
             }
         }
         
+        # Add breakdown details if requested
+        if calculation_mode == 'breakdown':
+            result["task_breakdown"] = sorted(task_details, key=lambda x: x['weighted_contribution'], reverse=True)
+        
+        return result
+        
     except Exception as e:
         logger.error(f"Error in enhanced slayer calculation: {e}")
+        return {"error": str(e), "gp_hr": 0}
+
+def calculate_specific_monster_gp_hr(monster_id, calc_params, user_params=None):
+    """
+    Calculate GP/hour for a specific monster.
+    """
+    try:
+        # Get monster data from database
+        monster_data = item_db.get_global_items('slayer', 'monsters')
+        monster_info = monster_data.get(monster_id)
+        
+        if not monster_info:
+            logger.warning(f"Monster not found: {monster_id}")
+            return {"error": f"Monster '{monster_id}' not found", "gp_hr": 0}
+        
+        # Check if user meets slayer level requirement
+        slayer_req = monster_info.get('slayer_level_req', 1)
+        if calc_params['user_slayer_level'] < slayer_req:
+            return {
+                "error": f"Insufficient Slayer level for {monster_info.get('name', monster_id)}", 
+                "gp_hr": 0,
+                "requirements": {
+                    "slayer_required": slayer_req,
+                    "user_slayer": calc_params['user_slayer_level']
+                }
+            }
+        
+        # Estimate KPH based on user stats
+        estimated_kph = estimate_kph(monster_info, calc_params, user_params)
+        
+        # Calculate expected loot per kill from drop table
+        expected_loot_per_kill = calculate_expected_loot(monster_info.get('drop_table', {}))
+        
+        # Calculate supply costs
+        base_supply_cost = monster_info.get('common_supply_cost_per_hour_base', 50000)
+        adjusted_supply_cost = adjust_supply_cost(base_supply_cost, calc_params, user_params)
+        
+        # Calculate GP/hour
+        hourly_revenue = estimated_kph * expected_loot_per_kill
+        gp_hr = hourly_revenue - adjusted_supply_cost
+        
+        return {
+            "gp_hr": round(gp_hr),
+            "monster_name": monster_info.get('name', monster_id),
+            "kills_per_hour": round(estimated_kph, 1),
+            "loot_per_kill": round(expected_loot_per_kill),
+            "hourly_revenue": round(hourly_revenue),
+            "supply_cost_per_hour": round(adjusted_supply_cost),
+            "user_levels": {
+                "slayer": calc_params['user_slayer_level'],
+                "combat": calc_params['user_combat_level']
+            },
+            "requirements": {
+                "slayer_required": slayer_req,
+                "combat_required": monster_info.get('combat_level_req', 1)
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error calculating specific monster GP/hr: {e}")
         return {"error": str(e), "gp_hr": 0}
 
 def estimate_kph(monster_info, user_params, user_overrides=None):
