@@ -12,6 +12,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 import logging
 from .ge_api import get_ge_price, get_average_price
+from .comprehensive_item_database import item_database
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -26,119 +27,8 @@ class OSRSWikiSyncService:
             'User-Agent': 'OSRS-GP-Tracker/1.0 (Educational/Personal Use)'
         })
         
-        # Known item ID mappings for common items
-        self.known_item_ids = {
-            'coins': 995,
-            'bones': 526,
-            'big bones': 532,
-            'dragon bones': 536,
-            'rune full helm': 1149,
-            'rune platebody': 1127,
-            'rune kiteshield': 1201,
-            'rune scimitar': 1333,
-            'granite maul': 1631,
-            'abyssal whip': 4151,
-            # Hydra items
-            'hydra leather': 22100,
-            'hydra tail': 22103,
-            'hydra claw': 22109,
-            'brimstone ring': 22114,
-            # Other valuable drops
-            'dragon chainbody': 3140,
-            'draconic visage': 11286,
-            'shield left half': 2366,
-            'dragon spear': 1249,
-            # Common rune items
-            'rune longsword': 1289,
-            'rune battleaxe': 1373,
-            'rune mace': 1432,
-            'rune dagger': 1213,
-            'rune sword': 1289,
-            'rune med helm': 1147,
-            'rune chainbody': 1113,
-            'rune platelegs': 1079,
-            'rune plateskirt': 1093,
-            'rune boots': 4131,
-            'rune 2h sword': 1319,
-            # Adamant items
-            'adamant platebody': 1123,
-            'adamant platelegs': 1073,
-            'adamant boots': 4129,
-            # Mithril/Steel/Iron items
-            'mithril platebody': 1121,
-            'steel platebody': 1119,
-            'iron platebody': 1115,
-            # Mystic robes
-            'mystic robe top (dark)': 4101,
-            'mystic robe bottom (dark)': 4103,
-            'mystic hat (dark)': 4099,
-            'mystic gloves (dark)': 4105,
-            'mystic boots (dark)': 4107,
-            # Common gems
-            'uncut diamond': 1617,
-            'uncut ruby': 1619,
-            'uncut emerald': 1621,
-            'uncut sapphire': 1623,
-            # Common herbs
-            'grimy ranarr weed': 207,
-            'grimy snapdragon': 3051,
-            'grimy torstol': 219,
-            'grimy dwarf weed': 217,
-            # Common resources
-            'coal': 453,
-            'iron ore': 440,
-            'gold ore': 444,
-            'gold bar': 2357,
-            'steel bar': 2353,
-            'mithril ore': 447,
-            'mithril bar': 2359,
-            'adamantite ore': 449,
-            'runite ore': 451,
-            'pure essence': 7936,
-            # Common food/supplies
-            'sharks': 385,
-            'monkfish': 7946,
-            'lobster': 379,
-            # Common runes
-            'nature rune': 561,
-            'death rune': 560,
-            'blood rune': 565,
-            'chaos rune': 562,
-            'fire rune': 554,
-            # Talismans
-            'chaos talisman': 1452,
-            'nature talisman': 1462,
-            # Key halves
-            'loop half of key': 985,
-            'tooth half of key': 987,
-            # Special items
-            'rune javelin': 830,
-            'rune spear': 1247,
-            'brimstone key': 22520,
-            'clue scroll (hard)': 2722,
-            'brittle key': 22557,
-            # Cerberus drops
-            'primordial crystal': 13231,
-            'pegasian crystal': 13229,
-            'eternal crystal': 13227,
-            'smouldering stone': 13233,
-            # Vorkath drops
-            'dragonbone necklace': 22111,
-            'vorkaths head': 21907,
-            'skeletal visage': 22006,
-            # Zulrah drops
-            'tanzanite fang': 12922,
-            'magic fang': 12932,
-            'serpentine visage': 12927,
-            'uncut onyx': 6571,
-            # Nechryael drops
-            'rune boots': 4131,
-            'death rune': 560,
-            # Common seeds
-            'ranarr seed': 5295,
-            'snapdragon seed': 5300,
-            'torstol seed': 5304
-        }
+        # Use the comprehensive item database
+        self.item_database = item_database
         
         # Base wiki URL
         self.wiki_base = "https://oldschool.runescape.wiki"
@@ -198,17 +88,38 @@ class OSRSWikiSyncService:
             return [1, 1]
     
     def _get_item_id(self, item_name: str) -> Optional[int]:
-        """Get item ID from name, using known mappings or wiki lookup"""
-        item_name_lower = item_name.lower().strip()
-        
-        # Check known mappings first
-        if item_name_lower in self.known_item_ids:
-            return self.known_item_ids[item_name_lower]
-        
-        # For now, return None for unknown items
-        # Could implement wiki API lookup here later
-        logger.warning(f"Unknown item ID for: {item_name}")
-        return None
+        """Get item ID from name, using comprehensive database"""
+        try:
+            # Use the comprehensive item database
+            item_id = self.item_database.get_item_id(item_name)
+            
+            if item_id:
+                return item_id
+            else:
+                # Log warning but don't return None immediately - try some fallbacks
+                logger.warning(f"Unknown item ID for: {item_name}")
+                
+                # Try some common variations
+                variations = [
+                    item_name.lower().replace(' (noted)', ''),
+                    item_name.lower().replace(' noted', ''),
+                    item_name.lower().replace('grimy ', ''),
+                    item_name.lower().replace(' seed', ' seed'),
+                    item_name.lower().replace('_', ' '),
+                ]
+                
+                for variation in variations:
+                    if variation != item_name.lower():
+                        alt_id = self.item_database.get_item_id(variation)
+                        if alt_id:
+                            logger.info(f"Found item ID for '{item_name}' using variation '{variation}': {alt_id}")
+                            return alt_id
+                
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error getting item ID for {item_name}: {e}")
+            return None
     
     def _parse_drop_table(self, soup: BeautifulSoup) -> Dict[str, List]:
         """Parse drop table from wiki page HTML"""

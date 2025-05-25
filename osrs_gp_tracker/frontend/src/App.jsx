@@ -1,133 +1,138 @@
 import React, { useState, useEffect } from 'react';
-import { onAuthStateChanged } from 'firebase/auth';
-import { auth, signInAnonymouslyUser } from './services/firebase';
-import { UserConfigProvider } from './context/UserConfigContext';
 import Navbar from './components/Navbar';
+import AdminPanel from './components/AdminPanel';
 import ActivityCard from './components/ActivityCard';
-import ActivityComparison from './components/ActivityComparison';
-import ConfigEditor from './components/ConfigEditor';
+import { UserConfigProvider } from './context/UserConfigContext';
+import { signInAnonymouslyUser } from './services/firebase';
 import { healthCheck } from './services/api';
 
 function App() {
-  const [user, setUser] = useState(null);
-  const [activeTab, setActiveTab] = useState('farming');
+  const [activeTab, setActiveTab] = useState('home');
   const [backendStatus, setBackendStatus] = useState('checking');
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
+  // Check backend health
   useEffect(() => {
     const checkBackend = async () => {
       try {
-        const result = await healthCheck();
-        setBackendStatus(result.firebase_connected ? 'connected' : 'firebase-error');
+        const response = await healthCheck();
+        setBackendStatus(response ? 'connected' : 'disconnected');
       } catch (error) {
+        console.error('Backend health check failed:', error);
         setBackendStatus('disconnected');
       }
     };
+
     checkBackend();
+    // Check every 30 seconds
+    const interval = setInterval(checkBackend, 30000);
+    return () => clearInterval(interval);
   }, []);
 
+  // Handle Firebase authentication
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      if (currentUser) {
-        setUser(currentUser);
-      } else {
-        signInAnonymouslyUser()
-          .then((userCredential) => {
-            setUser(userCredential.user);
-          })
-          .catch((error) => {
-            console.error('Authentication failed:', error);
-          });
+    const authenticateUser = async () => {
+      try {
+        setAuthLoading(true);
+        console.log('Attempting anonymous sign-in...');
+        
+        const userCredential = await signInAnonymouslyUser();
+        if (userCredential && userCredential.user) {
+          setCurrentUser(userCredential.user);
+          console.log('User authenticated:', userCredential.user.uid);
+        } else {
+          console.warn('Authentication failed, using fallback');
+        }
+      } catch (error) {
+        console.error('Authentication error:', error);
+        // Don't throw - continue with null user
+      } finally {
+        setAuthLoading(false);
       }
-    });
+    };
 
-    return () => unsubscribe();
+    authenticateUser();
   }, []);
+
+  const getStatusIndicator = () => {
+    switch (backendStatus) {
+      case 'connected':
+        return <span className="text-green-600 font-medium">🟢 Connected</span>;
+      case 'disconnected':
+        return <span className="text-red-600 font-medium">🔴 Disconnected</span>;
+      default:
+        return <span className="text-yellow-600 font-medium">🟡 Checking...</span>;
+    }
+  };
 
   const renderContent = () => {
+    // Show loading screen while auth is in progress
+    if (authLoading) {
+      return (
+        <div className="bg-white rounded-lg shadow-lg p-6 max-w-4xl mx-auto">
+          <h2 className="text-2xl font-bold text-amber-800 text-center mb-4">
+            🔧 Initializing Application
+          </h2>
+          <p className="text-amber-700 text-center mb-4">
+            Setting up Firebase authentication and user configuration...
+          </p>
+          <div className="flex justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-600"></div>
+          </div>
+        </div>
+      );
+    }
+
     switch (activeTab) {
-      // Single Activity Cases (existing functionality)
-      case 'farming':
-        return (
-          <ActivityCard
-            title="🌿 Herb Farming"
-            activityType="farming"
-            userId={user?.uid}
-          />
-        );
-      case 'birdhouse':
-        return (
-          <ActivityCard
-            title="🏠 Birdhouse Runs"
-            activityType="birdhouse"
-            userId={user?.uid}
-          />
-        );
-      case 'gotr':
-        return (
-          <ActivityCard
-            title="🔮 Guardians of the Rift"
-            activityType="gotr"
-            userId={user?.uid}
-          />
-        );
+      case 'admin':
+        return <AdminPanel />;
+      
       case 'slayer':
-        return (
-          <ActivityCard
-            title="⚔️ Slayer"
-            activityType="slayer"
-            userId={user?.uid}
-          />
-        );
-
-      // Comparison Cases (new functionality)
-      case 'compare-farming':
-        return (
-          <ActivityComparison
-            activityType="farming"
-            userId={user?.uid}
-          />
-        );
-      case 'compare-birdhouse':
-        return (
-          <ActivityComparison
-            activityType="birdhouse"
-            userId={user?.uid}
-          />
-        );
-      case 'compare-gotr':
-        return (
-          <ActivityComparison
-            activityType="gotr"
-            userId={user?.uid}
-          />
-        );
-      case 'compare-slayer':
-        return (
-          <ActivityComparison
-            activityType="slayer"
-            userId={user?.uid}
-          />
-        );
-
-      // Configuration Case (existing functionality)
-      case 'config':
-        return <ConfigEditor userId={user?.uid} />;
+        return <ActivityCard activityType="slayer" title="Slayer Calculator" userId={currentUser?.uid} />;
+      
+      case 'farming':
+        return <ActivityCard activityType="farming" title="Herb Farming Calculator" userId={currentUser?.uid} />;
+      
+      case 'birdhouse':
+        return <ActivityCard activityType="birdhouse" title="Birdhouse Run Calculator" userId={currentUser?.uid} />;
+        
+      case 'gotr':
+        return <ActivityCard activityType="gotr" title="Guardians of the Rift Calculator" userId={currentUser?.uid} />;
       
       default:
         return (
-          <div className="osrs-card p-6 max-w-4xl mx-auto">
-            <h2 className="text-2xl font-bold text-amber-800 text-center">
-              Welcome to OSRS GP/Hour Tracker! 🎉
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-4xl mx-auto">
+            <h2 className="text-2xl font-bold text-amber-800 text-center mb-4">
+              🎉 Firebase & Drop Tables Restored!
             </h2>
-            <p className="text-amber-700 text-center mt-4">
-              Track your Old School RuneScape activities and compare profitability.
+            <p className="text-amber-700 text-center mb-4">
+              Firebase is now active and slayer calculations should have proper drop table data.
             </p>
             <div className="mt-6 text-center">
-              <p className="text-gray-600 mb-4">Choose an activity from the navigation above to get started.</p>
-              <div className="bg-amber-50 p-4 rounded-lg">
-                <h3 className="font-bold text-amber-800 mb-2">New in Phase 1: Comparison Mode!</h3>
-                <p className="text-amber-700 text-sm">
-                  Use the "Compare" tabs to analyze multiple options side-by-side and find the most profitable activities.
+              {currentUser ? (
+                <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                  <h3 className="font-bold text-green-800 mb-2">✅ Authentication Active</h3>
+                  <p className="text-green-700 text-sm mb-2">
+                    User ID: {currentUser.uid}
+                  </p>
+                  <p className="text-green-600 text-sm">
+                    Your configurations will be saved to Firebase
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                  <h3 className="font-bold text-yellow-800 mb-2">⚠️ Fallback Mode</h3>
+                  <p className="text-yellow-700 text-sm">
+                    Using local configuration (changes won't be saved)
+                  </p>
+                </div>
+              )}
+              
+              <div className="mt-4">
+                <p className="text-amber-600 font-medium">✨ Ready to test slayer calculations!</p>
+                <p className="text-sm text-gray-600 mt-2">
+                  Click the "Slayer" tab to test the restored drop table functionality
                 </p>
               </div>
             </div>
@@ -136,21 +141,8 @@ function App() {
     }
   };
 
-  const getStatusIndicator = () => {
-    switch (backendStatus) {
-      case 'connected':
-        return <span className="text-green-600">🟢 Connected</span>;
-      case 'firebase-error':
-        return <span className="text-yellow-600">🟡 Backend OK, Firebase Issue</span>;
-      case 'disconnected':
-        return <span className="text-red-600">🔴 Backend Disconnected</span>;
-      default:
-        return <span className="text-gray-600">⏳ Checking...</span>;
-    }
-  };
-
   return (
-    <UserConfigProvider>
+    <UserConfigProvider userId={currentUser?.uid}>
       <div className="min-h-screen bg-gradient-to-b from-amber-50 to-orange-100">
         <Navbar activeTab={activeTab} setActiveTab={setActiveTab} />
         
@@ -158,7 +150,10 @@ function App() {
           {/* Status Bar */}
           <div className="mb-4 text-center text-sm">
             Backend: {getStatusIndicator()}
-            {user && <span className="ml-4 text-gray-600">User: {user.uid.slice(-6)}</span>}
+            <span className="ml-4 text-blue-600">🌐 Port: 3002</span>
+            {currentUser && (
+              <span className="ml-4 text-green-600">👤 User: {currentUser.uid.slice(-8)}</span>
+            )}
           </div>
 
           {/* Main Content */}

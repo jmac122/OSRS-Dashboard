@@ -15,6 +15,7 @@ from utils.calculations import calculate_activity_gp_hr, calculate_farming_gp_hr
 from utils.database_service import item_db
 from utils.auth_service import auth_service, require_admin, require_user_or_admin
 from utils.osrs_wiki_sync_service import OSRSWikiSyncService
+from utils.comprehensive_item_database import item_database
 
 # Load environment variables
 load_dotenv()
@@ -641,7 +642,7 @@ def update_user_override():
 # ==================== WIKI SYNC ====================
 
 @app.route('/api/admin/sync_wiki', methods=['POST'])
-# @require_admin  # Temporarily disabled for development
+@require_admin  # Re-enable admin authentication
 def sync_wiki_data():
     """Sync data from OSRS Wiki (admin only)"""
     try:
@@ -681,6 +682,116 @@ def sync_wiki_data():
             
     except Exception as e:
         logger.error(f"Error in wiki sync endpoint: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/admin/test_item_database', methods=['GET'])
+def test_item_database():
+    """Test the comprehensive item database"""
+    try:
+        # Test with problematic items from the logs
+        test_items = [
+            'limpwurt seed', 'strawberry seed', 'watermelon seed', 
+            'potato cactus seed', 'cactus seed', 'marrentill seed',
+            'harralander seed', 'granite maul', 'abyssal whip',
+            'rune boots', 'death rune', 'nature rune', 'coins'
+        ]
+        
+        results = {}
+        success_count = 0
+        
+        for item_name in test_items:
+            item_id = item_database.get_item_id(item_name)
+            results[item_name] = item_id
+            if item_id:
+                success_count += 1
+        
+        cache_stats = item_database.get_cache_stats()
+        
+        return jsonify({
+            "success": True,
+            "test_results": results,
+            "success_rate": f"{success_count}/{len(test_items)}",
+            "cache_stats": cache_stats,
+            "status": "READY" if success_count == len(test_items) else "NEEDS_WORK"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error testing item database: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/api/admin/build_item_database', methods=['POST'])
+@require_admin
+def build_item_database():
+    """Build the complete OSRS item database (admin only)"""
+    try:
+        from utils.comprehensive_item_database import item_database
+        
+        logger.info("🚀 Starting complete item database build...")
+        success = item_database.rebuild_complete_database()
+        
+        if success:
+            stats = item_database.get_cache_stats()
+            return jsonify({
+                'success': True,
+                'message': 'Complete item database built successfully',
+                'stats': stats
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to build complete item database'
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Error building item database: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/item_database/status', methods=['GET'])
+def get_item_database_status():
+    """Get status of the item database"""
+    try:
+        from utils.comprehensive_item_database import item_database
+        stats = item_database.get_cache_stats()
+        
+        return jsonify({
+            'success': True,
+            'status': stats,
+            'recommendations': {
+                'has_complete_db': stats.get('has_complete_database', False),
+                'should_build': not stats.get('complete_db_exists', False),
+                'total_items': stats.get('total_items', 0)
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting database status: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/item_database/search', methods=['GET'])
+def search_items():
+    """Search for items by name"""
+    try:
+        query = request.args.get('q', '').strip()
+        limit = int(request.args.get('limit', 10))
+        
+        if not query:
+            return jsonify({'success': False, 'error': 'Query parameter required'}), 400
+        
+        from utils.comprehensive_item_database import item_database
+        results = item_database.search_items(query, limit)
+        
+        return jsonify({
+            'success': True,
+            'query': query,
+            'results': results,
+            'total_found': len(results)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error searching items: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':

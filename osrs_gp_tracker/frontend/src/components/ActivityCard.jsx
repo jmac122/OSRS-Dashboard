@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { calculateGpHr, getSlayerMasters, getSlayerBreakdown } from '../services/api';
 import { useUserConfig } from '../context/UserConfigContext';
 import GPChart from './GPChart';
-import api from '../services/api';
+import * as api from '../services/api';
 
 const ActivityCard = ({ title, activityType, userId }) => {
-  const { userConfig, updateUserConfig } = useUserConfig();
+  const { userConfig, updateUserConfig, loading: configLoading, error: configError, usingFallback } = useUserConfig();
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);

@@ -18,6 +18,7 @@ const Navbar = ({ activeTab, setActiveTab }) => {
   ];
 
   const configTab = { id: 'config', label: 'Configuration', icon: '⚙️' };
+  const adminTab = { id: 'admin', label: 'Admin Panel', icon: '🔐' };
 
   return (
     <nav className="bg-gradient-to-r from-amber-600 to-amber-800 shadow-lg mb-6">
@@ -85,6 +86,17 @@ const Navbar = ({ activeTab, setActiveTab }) => {
                 <span className="mr-1">{configTab.icon}</span>
                 {configTab.label}
               </button>
+              <button
+                onClick={() => setActiveTab(adminTab.id)}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === adminTab.id
+                    ? 'bg-white text-amber-800 shadow-md'
+                    : 'text-amber-100 hover:text-white hover:bg-amber-700'
+                }`}
+              >
+                <span className="mr-1">{adminTab.icon}</span>
+                {adminTab.label}
+              </button>
             </div>
           </div>
         </div>
@@ -92,7 +104,7 @@ const Navbar = ({ activeTab, setActiveTab }) => {
         {/* Mobile Navigation */}
         <div className="md:hidden pb-3">
           <div className="grid grid-cols-2 gap-2">
-            {[...singleTabs, ...comparisonTabs, configTab].map((tab) => (
+            {[...singleTabs, ...comparisonTabs, configTab, adminTab].map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
