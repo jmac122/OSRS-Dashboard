@@ -26,8 +26,17 @@ logger = logging.getLogger(__name__)
 
 # Initialize Flask app
 app = Flask(__name__)
-app.secret_key = os.getenv('SECRET_KEY', 'your-secret-key-change-in-production')
 CORS(app, supports_credentials=True)  # Enable CORS for frontend communication
+
+# Configure secret key
+DEFAULT_SECRET_KEY = 'your-secret-key-change-in-production'
+app.secret_key = os.getenv('SECRET_KEY', DEFAULT_SECRET_KEY)
+
+if not app.debug and app.secret_key == DEFAULT_SECRET_KEY:
+    logger.critical("CRITICAL: Default SECRET_KEY is being used in a non-debug environment. This is insecure!")
+    # In a real production scenario, you might want to raise an exception here or exit.
+    # For this exercise, we'll log a critical error.
+    # raise RuntimeError("Default SECRET_KEY is insecure and cannot be used in production.")
 
 # Initialize Firebase Admin SDK
 try:
@@ -265,11 +274,30 @@ def save_user_configuration(user_id):
         
         config = data['config']
         
-        # Save to Firestore
-        save_user_config(user_id, config)
+        # Import and call the new helper function
+        from .utils.database_service import save_user_config_to_db
         
+        # Call the new helper function, passing the db client
+        save_success = save_user_config_to_db(user_id, config, db_client=db)
+
+        if save_success:
+            return jsonify({
+                "success": True,
+                "message": "Configuration saved successfully",
+                "user_id": user_id
+            })
+        else:
+            # If saving failed, return an error.
+            # The error is already logged in save_user_config_to_db.
+            return jsonify({
+                "success": False,
+                "error": "Failed to save configuration to database."
+            }), 500 # Internal server error, as the problem is on the server side
+
+    except Exception as e:
+        logger.error(f"Error saving user config for {user_id}: {e}")
         return jsonify({
-            "success": True,
+            "success": False,
             "message": "Configuration saved successfully",
             "user_id": user_id
         })

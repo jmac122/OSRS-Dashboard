@@ -270,24 +270,36 @@ class OSRSItemDatabase:
         }
     
     def rebuild_complete_database(self):
-        """Trigger a rebuild of the complete database"""
-        logger.info("🔄 Triggering complete database rebuild...")
+        """Trigger a rebuild of the complete database by calling the root script."""
+        logger.info("🔄 Triggering complete database rebuild by calling the root script...")
         
         try:
-            # Import and run the database builder
+            import subprocess
             import sys
-            import os
-            
-            # Add the parent directory to path to import the builder
-            parent_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-            sys.path.insert(0, parent_dir)
-            
-            from build_complete_item_database import CompleteItemDatabaseBuilder
-            
-            builder = CompleteItemDatabaseBuilder()
-            success = builder.run_complete_build()
-            
-            if success:
+
+            # Determine the path to the root build script
+            # Assumes this file is in osrs_gp_tracker/backend/utils/
+            # So, root_dir is three levels up.
+            current_dir = Path(__file__).parent
+            root_dir = current_dir.parent.parent.parent
+            build_script_path = root_dir / "build_complete_item_database.py"
+
+            if not build_script_path.exists():
+                logger.error(f"❌ Build script not found at {build_script_path}")
+                return False
+
+            # Ensure the script is executable (it should be due to previous chmod)
+            # Call the script using the same Python interpreter that's running this app
+            process = subprocess.run(
+                [sys.executable, str(build_script_path)],
+                capture_output=True,
+                text=True,
+                cwd=root_dir # Run the script from the root directory
+            )
+
+            if process.returncode == 0:
+                logger.info("✅ Complete database rebuild script executed successfully.")
+                logger.info(f"Script output:\n{process.stdout}")
                 # Reload the complete database
                 self.load_complete_database()
                 
@@ -295,15 +307,15 @@ class OSRSItemDatabase:
                 if self.complete_database:
                     self.items_cache.update(self.complete_database)
                     self.save_cache()
-                    
-                logger.info("✅ Complete database rebuild successful")
                 return True
             else:
-                logger.error("❌ Complete database rebuild failed")
+                logger.error(f"❌ Complete database rebuild script failed with return code {process.returncode}.")
+                logger.error(f"Script stdout:\n{process.stdout}")
+                logger.error(f"Script stderr:\n{process.stderr}")
                 return False
                 
         except Exception as e:
-            logger.error(f"Error rebuilding complete database: {e}")
+            logger.error(f"Error rebuilding complete database via subprocess: {e}")
             return False
 
 # Global instance

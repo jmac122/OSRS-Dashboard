@@ -14,19 +14,20 @@ def calculate_farming_gp_hr(params):
     Calculate GP/hour for herb farming (e.g., Torstol).
     
     Expected params:
-    - seed_id: Item ID for the seed
-    - herb_id: Item ID for the harvested herb
-    - compost_id: Item ID for compost used
+    - seed_id: Item ID for the seed (name will be resolved to ID)
+    - herb_id: Item ID for the harvested herb (name will be resolved to ID)
+    - compost_id: Item ID for compost used (name will be resolved to ID)
     - avg_yield_per_patch: Average herbs yielded per patch
     - num_patches: Number of patches farmed
     - growth_time_minutes: Time for herbs to grow (default 80 for Torstol)
     """
+    from .comprehensive_item_database import item_database # Import here to avoid circular dependency if any
     try:
         # Default values
         default_params = {
-            'seed_id': ITEM_IDS.get('torstol_seed', 5309),
-            'herb_id': ITEM_IDS.get('grimy_torstol', 219),
-            'compost_id': ITEM_IDS.get('ultracompost', 21483),
+            'seed_id': item_database.get_item_id('torstol seed') or 5309,
+            'herb_id': item_database.get_item_id('grimy torstol') or 219,
+            'compost_id': item_database.get_item_id('ultracompost') or 21483,
             'avg_yield_per_patch': 8,
             'num_patches': 9,
             'growth_time_minutes': 80
@@ -97,11 +98,12 @@ def calculate_birdhouse_gp_hr(params):
     - run_time_minutes: Active time per run in minutes
     - cycle_time_minutes: Total cycle time between runs (default 50)
     """
+    from .comprehensive_item_database import item_database # Import here
     try:
         # Default values for redwood birdhouses
         default_params = {
-            'log_id': ITEM_IDS.get('redwood_logs', 19669),
-            'seed_id': 5318,  # Potato seed (cheap)
+            'log_id': item_database.get_item_id('redwood logs') or 19669,
+            'seed_id': item_database.get_item_id('potato seed') or 5318,  # Potato seed (cheap)
             'avg_nests_per_run': 10,
             'avg_value_per_nest': 5000,  # Simplified average
             'run_time_minutes': 5,

@@ -61,6 +61,14 @@ pip install -r requirements.txt
 # Copy environment template and configure
 cp ../environment-template.txt ../.env
 # Edit .env with your Firebase credentials (optional)
+# Also set the following for security:
+# SECRET_KEY=your_very_strong_flask_secret_key
+# ADMIN_USERNAME=your_admin_username
+# ADMIN_PASSWORD_HASH=your_argon2_hashed_admin_password
+# To generate ADMIN_PASSWORD_HASH, you can use a Python terminal:
+# from osrs_gp_tracker.backend.utils.auth_service import AdminAuthService
+# print(AdminAuthService.generate_password_hash("your_chosen_admin_password"))
+# Then copy the output hash into your .env file.
 
 # Run the Flask server
 python app.py
