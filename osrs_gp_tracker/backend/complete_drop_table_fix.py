@@ -1,62 +1,38 @@
 #!/usr/bin/env python3
 """
-Complete Drop Table Fix Script
-Cleans up and re-populates all slayer monster drop tables with proper item data
+Complete Drop Table Fix
+Fixes empty/incomplete drop tables for all monsters using wiki sync
 """
 
-import os
 import sys
+import os
 import logging
-import time
 from datetime import datetime
 
-# Add the parent directory to Python path for imports
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-sys.path.insert(0, parent_dir)
+# Add the backend directory to Python path
+backend_path = os.path.dirname(__file__)
+sys.path.insert(0, backend_path)
 
-from utils.database_service import item_db
+# Import our centralized Firebase initialization
+from utils.firebase_init import initialize_firebase
+from utils.comprehensive_item_database import OSRSItemDatabase
 from utils.osrs_wiki_sync_service import OSRSWikiSyncService
-from utils.comprehensive_item_database import item_database
-import firebase_admin
-from firebase_admin import credentials, firestore
 
 # Set up logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('drop_table_fix.log'),
-        logging.StreamHandler()
-    ]
-)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def initialize_firebase():
-    """Initialize Firebase Admin SDK"""
-    try:
-        # Try to get existing app
-        app = firebase_admin.get_app()
-        logger.info("Using existing Firebase app")
-        return firestore.client(app)
-    except ValueError:
-        # No app exists, create one
-        try:
-            # Use service account key if available
-            cred_path = os.path.join(current_dir, 'firebase-service-account.json')
-            if os.path.exists(cred_path):
-                cred = credentials.Certificate(cred_path)
-                app = firebase_admin.initialize_app(cred)
-                logger.info("Initialized Firebase with service account")
-            else:
-                # Use default credentials (e.g., from environment)
-                app = firebase_admin.initialize_app()
-                logger.info("Initialized Firebase with default credentials")
-            
-            return firestore.client(app)
-        except Exception as e:
-            logger.error(f"Failed to initialize Firebase: {e}")
-            return None
+def setup_firebase():
+    """Initialize Firebase using our centralized utility"""
+    logger.info("Initializing Firebase connection...")
+    db = initialize_firebase()
+    
+    if db is None:
+        logger.error("Failed to initialize Firebase! Cannot proceed.")
+        return None
+    
+    logger.info("✅ Firebase initialized successfully")
+    return db
 
 def get_current_monsters(db):
     """Get all current slayer monsters from database"""
@@ -113,6 +89,8 @@ def clear_empty_drop_tables(db, monsters):
 
 def test_item_database():
     """Test the comprehensive item database with known problematic items"""
+    from utils.comprehensive_item_database import item_database
+    
     test_items = [
         'limpwurt seed',
         'strawberry seed', 
@@ -145,57 +123,62 @@ def test_item_database():
 
 def resync_high_value_monsters(db):
     """Re-sync specific high-value monsters that should be profitable"""
+    from utils.database_service import item_db
+    import time
     
-    priority_monsters = [
-        'gargoyles',
-        'abyssal_demons', 
-        'nechryael',
-        'alchemical_hydra',
-        'black_demons',
-        'greater_demons',
-        'dust_devils',
-        'kurask',
-        'bloodvelds',
-        'cave_horrors'
-    ]
+    logger.info("Re-syncing high-value monsters using wiki sync service...")
     
-    wiki_service = OSRSWikiSyncService(item_db)
-    
-    logger.info(f"Re-syncing {len(priority_monsters)} high-value monsters...")
-    
-    for monster_id in priority_monsters:
+    try:
+        # Use the wiki sync service to sync all slayer monsters
+        wiki_service = OSRSWikiSyncService(item_db)
+        
+        logger.info("Running comprehensive slayer monster sync...")
+        sync_results = wiki_service.sync_slayer_monsters(db)
+        
+        if sync_results:
+            logger.info(f"✅ Successfully synced {len(sync_results)} monsters")
+            
+            # Check specific high-value monsters
+            priority_monsters = [
+                'gargoyles', 'abyssal_demons', 'nechryael', 'alchemical_hydra',
+                'black_demons', 'greater_demons', 'dust_devils', 'kurask',
+                'bloodvelds', 'cave_horrors'
+            ]
+            
+            for monster_id in priority_monsters:
+                if monster_id in sync_results:
+                    monster_data = sync_results[monster_id]
+                    drop_table = monster_data.get('drop_table', {})
+                    total_drops = sum(len(drop_table.get(tier, [])) for tier in ['always', 'common', 'rare', 'very_rare'])
+                    avg_value = monster_data.get('avg_loot_value_per_kill', 0)
+                    logger.info(f"   {monster_id}: {total_drops} drops, {avg_value:.0f} GP/kill")
+                else:
+                    logger.warning(f"   {monster_id}: Not found in sync results")
+        else:
+            logger.error("❌ Wiki sync returned no results")
+            
+    except Exception as e:
+        logger.error(f"Error during wiki sync: {e}")
+        logger.info("Attempting fallback approach...")
+        
+        # Fallback: trigger the admin API sync endpoint
         try:
-            logger.info(f"Syncing {monster_id}...")
+            import requests
+            response = requests.post("http://localhost:5000/api/admin/sync_wiki", 
+                                   json={"sync_type": "slayer"}, 
+                                   timeout=300)
             
-            # Construct wiki URL
-            wiki_url = f"https://oldschool.runescape.wiki/w/{monster_id.replace('_', ' ').title()}"
-            
-            # Try to sync the monster
-            monster_data = wiki_service.extract_monster_data(wiki_url, monster_id)
-            
-            if monster_data:
-                # Save to database
-                monster_ref = db.collection('global_items').document('slayer').collection('monsters').document(monster_id)
-                monster_data['updated_at'] = datetime.now()
-                monster_data['last_synced'] = datetime.now().isoformat()
-                monster_data['source'] = 'wiki_resync'
-                
-                monster_ref.set(monster_data, merge=True)
-                logger.info(f"✅ Successfully synced {monster_id}")
-                
-                # Check drop table quality
-                drop_table = monster_data.get('drop_table', {})
-                total_drops = sum(len(drop_table.get(tier, [])) for tier in ['always', 'common', 'rare', 'very_rare'])
-                logger.info(f"   Drop table has {total_drops} total drops")
-                
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('success'):
+                    logger.info("✅ Successfully triggered wiki sync via API")
+                else:
+                    logger.error(f"API sync failed: {result.get('error')}")
             else:
-                logger.warning(f"❌ Failed to sync {monster_id}")
-            
-            # Small delay to be respectful
-            time.sleep(2)
-            
-        except Exception as e:
-            logger.error(f"Error syncing {monster_id}: {e}")
+                logger.error(f"API sync request failed: {response.status_code}")
+                
+        except Exception as api_error:
+            logger.error(f"Fallback API sync also failed: {api_error}")
     
     logger.info("High-value monster re-sync complete")
 
@@ -244,7 +227,7 @@ def main():
     
     # Step 2: Initialize Firebase
     logger.info("Step 2: Initializing Firebase connection...")
-    db = initialize_firebase()
+    db = setup_firebase()
     if not db:
         logger.error("Failed to initialize Firebase! Cannot proceed.")
         return False

@@ -1,0 +1,59 @@
+{
+  "timestamp": "2025-05-24T22:23:09.896976",
+  "summary": {
+    "total_issues": 3,
+    "critical": 1,
+    "high": 2,
+    "medium": 0,
+    "low": 0
+  },
+  "test_results": {
+    "/api/health": "PASS",
+    "/api/default_config": "PASS",
+    "/api/items/slayer?category=masters": "PASS",
+    "/api/items/slayer?category=monsters": "PASS",
+    "slayer_expected": "PASS",
+    "slayer_specific": "PASS",
+    "slayer_breakdown": "PASS",
+    "breakdown_endpoint": "PASS",
+    "frontend_server": "PASS",
+    "data_consistency": "FAIL",
+    "nieve_fix": "PASS"
+  },
+  "issues": [
+    {
+      "category": "CONSISTENCY",
+      "severity": "HIGH",
+      "description": "One or both calculations returned 0 GP/hr",
+      "details": {
+        "expected": -26823,
+        "breakdown": -24512
+      },
+      "timestamp": "2025-05-24T22:23:07.776608"
+    },
+    {
+      "category": "FRONTEND",
+      "severity": "CRITICAL",
+      "description": "Calculation mode switching doesn't trigger recalculation",
+      "details": {
+        "problem": "When user clicks Expected GP/hr vs Task Breakdown, the UI changes the calculation_mode parameter but does not call calculateGpHour()",
+        "location": "ActivityCard.jsx handleParamChange function",
+        "impact": "Users see no difference when switching modes",
+        "fix_needed": "Add conditional recalculation trigger for calculation_mode changes"
+      },
+      "timestamp": "2025-05-24T22:23:09.895110"
+    },
+    {
+      "category": "FRONTEND",
+      "severity": "HIGH",
+      "description": "Breakdown display logic may not be mode-aware",
+      "details": {
+        "problem": "Frontend shows slayerBreakdown data regardless of calculation_mode",
+        "location": "ActivityCard.jsx rendering logic",
+        "impact": "Task breakdown always shows, even in expected mode",
+        "fix_needed": "Conditional rendering based on calculation_mode"
+      },
+      "timestamp": "2025-05-24T22:23:09.895110"
+    }
+  ]
+}

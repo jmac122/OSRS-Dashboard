@@ -137,6 +137,18 @@ const ActivityCard = ({ title, activityType, userId }) => {
     // Save to user config but don't trigger calculation
     await updateUserConfig(activityType, { [paramName]: processedValue });
     
+    // CRITICAL FIX: Trigger recalculation for calculation_mode changes
+    if (activityType === 'slayer' && paramName === 'calculation_mode') {
+      // Clear previous results and trigger immediate recalculation
+      setResult(null);
+      setSlayerBreakdown(null);
+      
+      // Small delay to ensure state is updated, then recalculate
+      setTimeout(() => {
+        calculateGpHour();
+      }, 100);
+    }
+    
     // For Slayer, load breakdown when master or key levels change
     if (activityType === 'slayer' && 
         (paramName === 'slayer_master_id' || 
@@ -778,8 +790,8 @@ const ActivityCard = ({ title, activityType, userId }) => {
         {renderActivitySpecificInputs()}
       </div>
 
-      {/* Slayer Breakdown - only show for slayer activity */}
-      {activityType === 'slayer' && slayerBreakdown && (
+      {/* Slayer Breakdown - only show for slayer activity AND when in breakdown mode */}
+      {activityType === 'slayer' && slayerBreakdown && getInputValue('calculation_mode', 'expected') === 'breakdown' && (
         <div className="mb-8 bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl border-2 border-blue-200 shadow-lg">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-2xl font-bold text-blue-800 flex items-center">
